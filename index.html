@@ -242,6 +242,66 @@
 
   select.search-input{ cursor: pointer; }
 
+  .file-input{
+    width: 100%;
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 11.5px;
+    color: var(--text-dim);
+    background: var(--surface-alt);
+    border: 1px dashed var(--border-strong);
+    border-radius: 7px;
+    padding: 6px 8px;
+  }
+  .file-input::file-selector-button{
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 11px;
+    border: 1px solid var(--border-strong);
+    background: var(--surface);
+    color: var(--text);
+    border-radius: 5px;
+    padding: 4px 8px;
+    margin-right: 8px;
+    cursor: pointer;
+  }
+  .source-body-or{
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 10px;
+    color: var(--text-faint);
+    text-align: center;
+    margin: -2px 0;
+  }
+
+  .vo-block{
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+    margin: 0 0 22px;
+  }
+  .vo-thumb{
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+    text-decoration: none;
+  }
+  .vo-thumb img{
+    width: 130px;
+    height: auto;
+    border-radius: 8px;
+    border: 1px solid var(--border-strong);
+    box-shadow: 0 2px 8px rgba(0,0,0,0.18);
+    background: var(--surface-alt);
+    display: block;
+  }
+  .vo-thumb span{
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 10px;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--text-faint);
+  }
+  .vo-thumb:hover span{ color: var(--accent); }
+
   .filter-row{
     display: flex;
     align-items: center;
@@ -638,22 +698,38 @@
 
     <div class="source-panel" id="historyPanel" hidden>
       <div class="source-body" style="padding-top:12px">
-        <label class="source-label" for="historyFileInput">Fichier de traduction (lien GitHub vers LE fichier)</label>
-        <input class="search-input" id="historyFileInput" type="text" autocomplete="off"
-               placeholder="https://github.com/owner/repo/blob/main/data/project_fr.json">
-        <div class="source-actions">
-          <button type="button" id="historyLoadBtn">Charger l'historique</button>
-        </div>
-        <div id="historyPickers" hidden style="display:flex;flex-direction:column;gap:8px;margin-top:4px">
-          <label class="source-label" for="historyFromSelect">Version de départ</label>
-          <select class="search-input" id="historyFromSelect"></select>
-          <label class="source-label" for="historyToSelect">Version d'arrivée</label>
-          <select class="search-input" id="historyToSelect"></select>
-          <div class="source-actions">
-            <button type="button" id="historyCompareBtn">Comparer</button>
-          </div>
+        <label class="source-label">Version A — origine</label>
+        <input class="search-input" id="historyUrlA" type="text" autocomplete="off" placeholder="Lien GitHub vers le fichier">
+        <p class="source-body-or">— ou —</p>
+        <input class="file-input" id="historyFileA" type="file" accept="application/json,.json">
+
+        <label class="source-label" style="margin-top:10px">Version B — comparaison</label>
+        <input class="search-input" id="historyUrlB" type="text" autocomplete="off" placeholder="Lien GitHub vers le fichier">
+        <p class="source-body-or">— ou —</p>
+        <input class="file-input" id="historyFileB" type="file" accept="application/json,.json">
+
+        <div class="source-actions" style="margin-top:6px">
+          <button type="button" id="historyCompareBtn">Comparer</button>
         </div>
         <p class="source-status" id="historyStatus"></p>
+      </div>
+    </div>
+
+    <div class="source-panel" id="driveImagePanel">
+      <button class="source-toggle" id="driveToggle" type="button">
+        <span>🖼 Images VO (Google Drive)</span>
+        <span class="source-toggle-current" id="driveModeLabel">non configuré</span>
+      </button>
+      <div class="source-body" id="driveBody" hidden>
+        <label class="source-label" for="driveFolderInput">Dossier Google Drive (lien de partage)</label>
+        <input class="search-input" id="driveFolderInput" type="text" autocomplete="off"
+               placeholder="https://drive.google.com/drive/folders/…">
+        <label class="source-label" for="driveApiKeyInput" style="margin-top:6px">Clé API Google (Drive API)</label>
+        <input class="search-input" id="driveApiKeyInput" type="text" autocomplete="off" placeholder="AIza…">
+        <div class="source-actions">
+          <button type="button" id="driveLoadBtn">Charger les images</button>
+        </div>
+        <p class="source-status" id="driveStatus">Voir le README pour créer la clé API (gratuit, 2 min).</p>
       </div>
     </div>
 
@@ -738,9 +814,6 @@ const LOCAL_LANGS = [
   let CARD_DATA = { project_name: "", cards: [] };
 
   const historyState = {
-    owner: null, repo: null, branch: null, path: null,
-    commits: [],
-    fromSha: null, toSha: null,
     rows: []
   };
 
@@ -873,6 +946,8 @@ const LOCAL_LANGS = [
       html += '</div>';
     }
     html += '</div>';
+
+    html += renderVoImageBlock(card.project_number);
 
     if(LANGS.length === 0){
       html += '<div class="callout warn" style="margin:0 0 18px">' +
@@ -1222,6 +1297,102 @@ const LOCAL_LANGS = [
     return byId;
   }
 
+  /* ---------------- Images VO (Google Drive) ----------------
+     Un dossier Drive public (partage "avec le lien") contenant des scans/exports
+     des cartes imprimées ne fournit pas de texte : on l'utilise juste comme
+     référence visuelle à côté du texte original/traduit. Chaque image est
+     associée à une carte via le nombre en tête de son nom de fichier
+     (ex. "268 Anachronism.jpg" → project_number = "268"). */
+
+  let driveImageIndex = {}; // { "<project_number>": { front: fileId, back: fileId } }
+
+  function parseGoogleDriveFolderId(input){
+    const s = (input || "").trim();
+    let m = s.match(/\/folders\/([a-zA-Z0-9_-]+)/);
+    if(m) return m[1];
+    m = s.match(/[?&]id=([a-zA-Z0-9_-]+)/);
+    if(m) return m[1];
+    if(/^[a-zA-Z0-9_-]{10,}$/.test(s)) return s; // l'utilisateur a peut-être collé directement l'ID
+    return null;
+  }
+
+  function classifyDriveFilename(name){
+    const m = (name || "").match(/^0*(\d+)/);
+    if(!m) return null;
+    const rest = name.slice(m[0].length);
+    const isBack = /back|verso|\bb\b/i.test(rest);
+    return { number: m[1], side: isBack ? "back" : "front" };
+  }
+
+  async function fetchAllDriveFiles(folderId, apiKey){
+    let files = [];
+    let pageToken = "";
+    do{
+      const url = "https://www.googleapis.com/drive/v3/files?q=" +
+        encodeURIComponent("'" + folderId + "' in parents and trashed = false") +
+        "&fields=" + encodeURIComponent("nextPageToken,files(id,name)") +
+        "&pageSize=1000&key=" + encodeURIComponent(apiKey) +
+        (pageToken ? "&pageToken=" + encodeURIComponent(pageToken) : "");
+      const r = await fetch(url);
+      if(!r.ok){
+        let detail = "";
+        try{ const j = await r.json(); if(j.error && j.error.message) detail = " — " + j.error.message; } catch(e){}
+        throw new Error("Google Drive API → HTTP " + r.status + detail);
+      }
+      const data = await r.json();
+      files = files.concat(data.files || []);
+      pageToken = data.nextPageToken || "";
+    } while(pageToken);
+    return files;
+  }
+
+  function driveImageUrl(fileId, size){
+    return "https://drive.google.com/thumbnail?id=" + encodeURIComponent(fileId) + "&sz=w" + (size || 1000);
+  }
+
+  async function loadDriveImages(folderInputVal, apiKey){
+    const folderId = parseGoogleDriveFolderId(folderInputVal);
+    if(!folderId) throw new Error("Lien de dossier Google Drive invalide.");
+    if(!apiKey) throw new Error("Clé API Google manquante (voir le README).");
+    const files = await fetchAllDriveFiles(folderId, apiKey);
+    const index = {};
+    let matchedFiles = 0;
+    files.forEach(function(f){
+      const c = classifyDriveFilename(f.name);
+      if(!c) return;
+      if(!index[c.number]) index[c.number] = {};
+      if(!index[c.number][c.side]){
+        index[c.number][c.side] = f.id;
+        matchedFiles++;
+      }
+    });
+    driveImageIndex = index;
+    try{
+      localStorage.setItem("dm_drive_folder", folderInputVal);
+      localStorage.setItem("dm_drive_key", apiKey);
+    } catch(e){}
+    return { totalFiles: files.length, matchedFiles: matchedFiles, numbers: Object.keys(index).length };
+  }
+
+  function renderVoImageBlock(projectNumber){
+    if(!projectNumber) return "";
+    const entry = driveImageIndex[String(projectNumber)];
+    if(!entry) return "";
+    let html = "";
+    if(entry.front){
+      html += '<a class="vo-thumb" href="https://drive.google.com/file/d/' + encodeURIComponent(entry.front) + '/view" target="_blank" rel="noopener">' +
+        '<img src="' + driveImageUrl(entry.front, 600) + '" alt="Carte imprimée VO" loading="lazy">' +
+        '<span>VO imprimée</span></a>';
+    }
+    if(entry.back){
+      html += '<a class="vo-thumb" href="https://drive.google.com/file/d/' + encodeURIComponent(entry.back) + '/view" target="_blank" rel="noopener">' +
+        '<img src="' + driveImageUrl(entry.back, 600) + '" alt="Dos de la carte VO" loading="lazy">' +
+        '<span>VO — dos</span></a>';
+    }
+    if(!html) return "";
+    return '<div class="vo-block">' + html + '</div>';
+  }
+
   async function loadFromGithub(sourceStr){
     const parsed = parseGithubSource(sourceStr);
     if(!parsed){
@@ -1344,10 +1515,13 @@ const LOCAL_LANGS = [
   }
 
   /* ================================================================
-     MODE "HISTORIQUE" — compare deux commits Git d'UN fichier de
-     traduction et surligne les changements mot à mot. S'appuie sur la
-     liste de cartes déjà chargée dans l'onglet Traductions (identifiants,
-     noms, regroupement par set) pour savoir à quoi correspond chaque id.
+     MODE "HISTORIQUE" — compare DEUX fichiers JSON quelconques (origine
+     vs comparaison) et surligne les changements mot à mot. Chaque
+     version peut venir d'un lien GitHub ou d'un fichier choisi sur
+     l'ordinateur — les deux fichiers n'ont pas besoin d'être liés par
+     Git ni d'avoir le même nom. S'appuie sur la liste de cartes déjà
+     chargée dans l'onglet Traductions (identifiants, noms, regroupement
+     par set) pour savoir à quoi correspond chaque id.
      ================================================================ */
 
   function setHistoryStatus(msg, kind){
@@ -1381,59 +1555,30 @@ const LOCAL_LANGS = [
     return JSON.parse(text);
   }
 
-  function formatCommitLabel(commit){
-    const sha = commit.sha.slice(0, 7);
-    const date = commit.commit && commit.commit.author ? commit.commit.author.date.slice(0, 10) : "";
-    let msg = (commit.commit && commit.commit.message || "").split("\n")[0];
-    if(msg.length > 42) msg = msg.slice(0, 42) + "…";
-    return sha + " · " + date + " · " + msg;
-  }
-
-  async function loadHistoryFile(urlStr){
-    const parsed = parseGithubFileUrl(urlStr);
-    if(!parsed){
-      setHistoryStatus("URL non reconnue. Il faut un lien vers UN fichier, ex. https://github.com/owner/repo/blob/main/data/project_fr.json", "err");
-      return;
-    }
-    historyState.owner = parsed.owner;
-    historyState.repo = parsed.repo;
-    historyState.branch = parsed.branch;
-    historyState.path = parsed.path;
-
-    setHistoryStatus("Récupération de l'historique de " + parsed.path + "…");
-    document.getElementById("historyPickers").hidden = true;
-    try{
-      const commitsUrl = "https://api.github.com/repos/" + parsed.owner + "/" + parsed.repo +
-        "/commits?path=" + encodeURIComponent(parsed.path) + "&sha=" + encodeURIComponent(parsed.branch) + "&per_page=100";
-      const commits = await ghJson(commitsUrl);
-      console.log("[history] commits trouvés pour " + parsed.path + " :", commits.length);
-      if(!Array.isArray(commits) || commits.length === 0){
-        setHistoryStatus("Aucun commit trouvé pour ce fichier sur cette branche.", "err");
-        return;
+  // Charge une "version" à comparer : priorité au fichier choisi sur l'ordinateur
+  // (input file), sinon on suit le lien GitHub fourni (lien vers UN fichier).
+  async function loadHistorySlot(fileInputEl, urlInputEl, label){
+    const file = fileInputEl.files && fileInputEl.files[0];
+    if(file){
+      const text = await file.text();
+      try{
+        return JSON.parse(text);
+      } catch(e){
+        throw new Error(label + " (" + file.name + ") : JSON invalide — " + e.message);
       }
-      historyState.commits = commits; // du plus récent au plus ancien
-
-      const fromSelect = document.getElementById("historyFromSelect");
-      const toSelect = document.getElementById("historyToSelect");
-      fromSelect.innerHTML = "";
-      toSelect.innerHTML = "";
-      commits.forEach(function(c){
-        const label = formatCommitLabel(c);
-        fromSelect.appendChild(new Option(label, c.sha));
-        toSelect.appendChild(new Option(label, c.sha));
-      });
-      // par défaut : le plus ancien commit connu vs le plus récent (HEAD)
-      fromSelect.value = commits[commits.length - 1].sha;
-      toSelect.value = commits[0].sha;
-
-      document.getElementById("historyPickers").hidden = false;
-      setHistoryStatus(commits.length + " commit(s) trouvé(s) pour ce fichier. Choisissez deux versions puis « Comparer ».", "ok");
-
-      if(commits.length >= 2) runHistoryCompare();
-    } catch(err){
-      console.error(err);
-      setHistoryStatus("Échec : " + err.message, "err");
     }
+    const urlStr = (urlInputEl.value || "").trim();
+    if(!urlStr){
+      throw new Error(label + " : choisissez un fichier ou collez un lien GitHub.");
+    }
+    const ghFile = parseGithubFileUrl(urlStr);
+    if(ghFile){
+      return await fetchFileAtRef(ghFile.owner, ghFile.repo, ghFile.path, ghFile.branch);
+    }
+    // lien direct quelconque (ex. raw.githubusercontent.com, ou toute URL JSON publique avec CORS)
+    const r = await fetch(urlStr, { cache: "no-cache" });
+    if(!r.ok) throw new Error(label + " → HTTP " + r.status);
+    return r.json();
   }
 
   async function runHistoryCompare(){
@@ -1441,17 +1586,16 @@ const LOCAL_LANGS = [
       setHistoryStatus("Chargez d'abord une source dans l'onglet « Traductions » (fichiers locaux ou GitHub) pour obtenir la liste des cartes.", "err");
       return;
     }
-    const fromSha = document.getElementById("historyFromSelect").value;
-    const toSha = document.getElementById("historyToSelect").value;
-    if(!fromSha || !toSha) return;
 
-    setHistoryStatus("Téléchargement des deux versions…");
+    setHistoryStatus("Chargement des deux versions…");
     try{
       const results = await Promise.all([
-        fetchFileAtRef(historyState.owner, historyState.repo, historyState.path, fromSha),
-        fetchFileAtRef(historyState.owner, historyState.repo, historyState.path, toSha)
+        loadHistorySlot(document.getElementById("historyFileA"), document.getElementById("historyUrlA"), "Version A"),
+        loadHistorySlot(document.getElementById("historyFileB"), document.getElementById("historyUrlB"), "Version B")
       ]);
       const dataA = results[0], dataB = results[1];
+      console.log("[history] version A :", dataA.language ? "langue=" + dataA.language : "(pas de champ language)");
+      console.log("[history] version B :", dataB.language ? "langue=" + dataB.language : "(pas de champ language)");
       const lookupA = buildLookupById(dataA.cards);
       const lookupB = buildLookupById(dataB.cards);
       console.log("[history] version de départ :", Object.keys(lookupA).length, "carte(s) —",
@@ -1489,6 +1633,7 @@ const LOCAL_LANGS = [
           name: name,
           encounter_set_name: skel ? skel.encounter_set_name : "Cartes hors du projet de base",
           order: skel ? skel.order : 99999,
+          project_number: skel ? skel.project_number : null,
           status: d.status,
           a: d.a,
           b: d.b
@@ -1500,8 +1645,6 @@ const LOCAL_LANGS = [
       });
 
       historyState.rows = rows;
-      historyState.fromSha = fromSha;
-      historyState.toSha = toSha;
 
       setHistoryStatus(
         counts.modified + " modifiée(s) · " + counts.added + " ajoutée(s) · " +
@@ -1572,6 +1715,8 @@ const LOCAL_LANGS = [
       '<div class="card-title-row"><h2 class="card-title">' + escapeHtml(row.name || row.id) + '</h2>' +
       '<span class="type-badge" style="background:var(--' + tok + '-soft, transparent);color:var(--' + tok + ')">' +
       escapeHtml(HISTORY_STATUS_LABEL[row.status] || "") + '</span></div></div></div>';
+
+    html += renderVoImageBlock(row.project_number);
 
     let faces = renderHistoryFace("front", "avant", row) + renderHistoryFace("back", "arrière", row);
     if(!faces){
@@ -1696,14 +1841,12 @@ const LOCAL_LANGS = [
 
   document.getElementById("onlyChangedCheckbox").addEventListener("change", buildHistoryList);
 
-  document.getElementById("historyLoadBtn").addEventListener("click", function(){
-    const val = document.getElementById("historyFileInput").value;
-    if(val.trim()) loadHistoryFile(val);
-  });
-  document.getElementById("historyFileInput").addEventListener("keydown", function(e){
-    if(e.key === "Enter" && e.target.value.trim()) loadHistoryFile(e.target.value);
-  });
   document.getElementById("historyCompareBtn").addEventListener("click", runHistoryCompare);
+  ["historyUrlA","historyUrlB"].forEach(function(id){
+    document.getElementById(id).addEventListener("keydown", function(e){
+      if(e.key === "Enter") runHistoryCompare();
+    });
+  });
 
   document.getElementById("sourceToggle").addEventListener("click", function(){
     const body = document.getElementById("sourceBody");
@@ -1719,6 +1862,43 @@ const LOCAL_LANGS = [
       if(val.trim()) loadFromGithub(val);
     }
   });
+  document.getElementById("driveToggle").addEventListener("click", function(){
+    const body = document.getElementById("driveBody");
+    body.hidden = !body.hidden;
+  });
+
+  function rerenderCurrent(){
+    // Réaffiche la carte active pour prendre en compte les nouvelles images VO.
+    if(!state.activeId) return;
+    if(state.viewMode === "history") selectHistoryRow(state.activeId);
+    else selectCard(state.activeId);
+  }
+
+  async function runDriveLoad(){
+    const folderVal = document.getElementById("driveFolderInput").value;
+    const apiKey = document.getElementById("driveApiKeyInput").value.trim();
+    const statusEl = document.getElementById("driveStatus");
+    statusEl.className = "source-status";
+    statusEl.textContent = "Chargement du dossier Drive…";
+    try{
+      const res = await loadDriveImages(folderVal, apiKey);
+      statusEl.className = "source-status ok";
+      statusEl.textContent = res.numbers + " numéro(s) de carte associé(s) sur " + res.totalFiles + " fichier(s) trouvés.";
+      document.getElementById("driveModeLabel").textContent = res.numbers + " cartes";
+      rerenderCurrent();
+    } catch(err){
+      console.error("[drive]", err);
+      statusEl.className = "source-status err";
+      statusEl.textContent = "Échec : " + err.message;
+    }
+  }
+  document.getElementById("driveLoadBtn").addEventListener("click", runDriveLoad);
+  ["driveFolderInput","driveApiKeyInput"].forEach(function(id){
+    document.getElementById(id).addEventListener("keydown", function(e){
+      if(e.key === "Enter") runDriveLoad();
+    });
+  });
+
   document.getElementById("sourceLocalBtn").addEventListener("click", function(){
     state.sourceMode = "local";
     try{ localStorage.removeItem("dm_source"); } catch(e){}
@@ -1746,6 +1926,17 @@ const LOCAL_LANGS = [
       loadFromGithub(initialSource);
     } else {
       loadFromLocal();
+    }
+
+    let savedDriveFolder = null, savedDriveKey = null;
+    try{
+      savedDriveFolder = localStorage.getItem("dm_drive_folder");
+      savedDriveKey = localStorage.getItem("dm_drive_key");
+    } catch(e){}
+    if(savedDriveFolder && savedDriveKey){
+      document.getElementById("driveFolderInput").value = savedDriveFolder;
+      document.getElementById("driveApiKeyInput").value = savedDriveKey;
+      runDriveLoad();
     }
   }
 
