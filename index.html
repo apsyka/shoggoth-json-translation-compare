@@ -871,37 +871,50 @@ const LOCAL_LANGS = [
   function mergeData(project, langData){
     const esOrder = {}, esName = {};
     (project.encounter_sets || []).forEach(function(e){
+      if(!e || !e.id) return;
       esOrder[e.id] = (e.order !== undefined) ? e.order : 9999;
       esName[e.id] = e.name;
     });
 
-    const cards = (project.cards || []).map(function(c){
-      const esid = c.encounter_set || null;
-      const entry = {
-        id: c.id,
-        encounter_set_id: esid,
-        encounter_set_name: esid ? (esName[esid] || "Set inconnu") : "Cartes joueur / hors campagne",
-        order: (esid && esid in esOrder) ? esOrder[esid] : 9999,
-        project_number: c.project_number || "",
-        encounter_number: c.encounter_number || "",
-        name: c.name || "",
-        front: Object.assign({ type: (c.front && c.front.type) || "" }, side(c.front)),
-        back: Object.assign({ type: (c.back && c.back.type) || "" }, side(c.back)),
-        translations: {}
-      };
-      LANGS.forEach(function(L){
-        const ld = langData[L.code] || { cards: {}, encounter_sets: {} };
-        const tc = (ld.cards || {})[c.id];
-        const tset = esid ? ((ld.encounter_sets || {})[esid] || {}) : {};
-        entry.translations[L.code] = {
-          name: (tc && tc.name) || "",
-          encounter_set_name: tset.name || "",
-          front: side(tc && tc.front),
-          back: side(tc && tc.back),
-          present: !!tc
+    const rawCards = Array.isArray(project.cards) ? project.cards : [];
+    const cards = [];
+    let skipped = 0;
+
+    rawCards.forEach(function(c, idx){
+      // certains exports JSON édités à la main contiennent des entrées vides
+      // (null, {} ou sans id) — on les ignore plutôt que de faire planter tout le chargement.
+      if(!c || typeof c !== "object" || !c.id){ skipped++; return; }
+      try{
+        const esid = c.encounter_set || null;
+        const entry = {
+          id: c.id,
+          encounter_set_id: esid,
+          encounter_set_name: esid ? (esName[esid] || "Set inconnu") : "Cartes joueur / hors campagne",
+          order: (esid && esid in esOrder) ? esOrder[esid] : 9999,
+          project_number: c.project_number || "",
+          encounter_number: c.encounter_number || "",
+          name: c.name || "",
+          front: Object.assign({ type: (c.front && c.front.type) || "" }, side(c.front)),
+          back: Object.assign({ type: (c.back && c.back.type) || "" }, side(c.back)),
+          translations: {}
         };
-      });
-      return entry;
+        LANGS.forEach(function(L){
+          const ld = langData[L.code] || { cards: {}, encounter_sets: {} };
+          const tc = (ld.cards || {})[c.id];
+          const tset = esid ? ((ld.encounter_sets || {})[esid] || {}) : {};
+          entry.translations[L.code] = {
+            name: (tc && tc.name) || "",
+            encounter_set_name: (tset && tset.name) || "",
+            front: side(tc && tc.front),
+            back: side(tc && tc.back),
+            present: !!tc
+          };
+        });
+        cards.push(entry);
+      } catch(e){
+        console.warn("Carte ignorée (index " + idx + " du tableau 'cards') :", e, c);
+        skipped++;
+      }
     });
 
     cards.sort(function(a, b){
@@ -912,7 +925,7 @@ const LOCAL_LANGS = [
       return ea < eb ? -1 : (ea > eb ? 1 : 0);
     });
 
-    return { project_name: project.name || "", cards: cards };
+    return { project_name: project.name || "", cards: cards, skipped: skipped };
   }
 
   function showFatalError(message, hint){
@@ -929,6 +942,11 @@ const LOCAL_LANGS = [
 
   function afterDataReady(){
     document.getElementById("projectTitle").textContent = CARD_DATA.project_name || "Comparateur";
+    if(CARD_DATA.skipped){
+      const prev = document.getElementById("sourceStatus").textContent;
+      const warn = "⚠ " + CARD_DATA.skipped + " entrée(s) invalide(s) dans 'cards' ignorée(s) (voir la console)";
+      setStatus(prev ? (prev + " — " + warn) : warn, "err");
+    }
     buildList();
     if(CARD_DATA.cards.length){
       document.getElementById("main").innerHTML =
@@ -937,7 +955,7 @@ const LOCAL_LANGS = [
       state.activeId = null;
       selectCard(CARD_DATA.cards[0].id);
     } else {
-      showFatalError("Aucune carte trouvée dans les données chargées.");
+      showFatalError("Aucune carte valide trouvée dans les données chargées.");
     }
   }
 
