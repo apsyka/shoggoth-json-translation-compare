@@ -1,0 +1,1167 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Dark Matter — Dossier de traduction</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,600;0,9..144,700;1,9..144,500&family=Literata:ital,opsz,wght@0,7..72,400;0,7..72,500;0,7..72,600;1,7..72,400&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+<style>
+  :root{
+    --bg: #f3efe6;
+    --surface: #ffffff;
+    --surface-alt: #eae4d6;
+    --surface-raised: #ffffff;
+    --text: #241f1a;
+    --text-dim: #6b6255;
+    --text-faint: #9a917f;
+    --border: #ddd4c0;
+    --border-strong: #c9bda1;
+    --accent: #5b3f8f;
+    --accent-soft: #efe8fb;
+    --accent-contrast: #ffffff;
+    --amber: #a8621f;
+    --amber-soft: #f6e6d3;
+    --good: #2f7a4f;
+    --good-soft: #e2f1e6;
+    --miss: #a13f3f;
+    --miss-soft: #f7e4e2;
+    --shadow: 0 1px 2px rgba(40,30,10,0.06), 0 8px 24px -12px rgba(40,30,10,0.18);
+    --radius: 10px;
+    color-scheme: light;
+  }
+  @media (prefers-color-scheme: dark){
+    :root:not([data-theme="light"]){
+      --bg: #0c0d13;
+      --surface: #14151d;
+      --surface-alt: #1b1d28;
+      --surface-raised: #1c1e29;
+      --text: #eae7f2;
+      --text-dim: #a29cb5;
+      --text-faint: #716c85;
+      --border: #2a2c3a;
+      --border-strong: #3a3d50;
+      --accent: #9b7fd4;
+      --accent-soft: #26203c;
+      --accent-contrast: #12101c;
+      --amber: #d99a52;
+      --amber-soft: #332617;
+      --good: #6fbb8c;
+      --good-soft: #16261c;
+      --miss: #d98080;
+      --miss-soft: #2c1a1a;
+      --shadow: 0 1px 2px rgba(0,0,0,0.4), 0 12px 32px -14px rgba(0,0,0,0.6);
+      color-scheme: dark;
+    }
+  }
+  :root[data-theme="dark"]{
+    --bg: #0c0d13;
+    --surface: #14151d;
+    --surface-alt: #1b1d28;
+    --surface-raised: #1c1e29;
+    --text: #eae7f2;
+    --text-dim: #a29cb5;
+    --text-faint: #716c85;
+    --border: #2a2c3a;
+    --border-strong: #3a3d50;
+    --accent: #9b7fd4;
+    --accent-soft: #26203c;
+    --accent-contrast: #12101c;
+    --amber: #d99a52;
+    --amber-soft: #332617;
+    --good: #6fbb8c;
+    --good-soft: #16261c;
+    --miss: #d98080;
+    --miss-soft: #2c1a1a;
+    --shadow: 0 1px 2px rgba(0,0,0,0.4), 0 12px 32px -14px rgba(0,0,0,0.6);
+    color-scheme: dark;
+  }
+
+  *{ box-sizing: border-box; }
+  body{
+    background: var(--bg);
+    color: var(--text);
+    font-family: "Literata", Georgia, "Times New Roman", serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  ::selection{ background: var(--accent-soft); }
+
+  .app{
+    display: grid;
+    grid-template-columns: 300px 1fr;
+    min-height: 100vh;
+  }
+
+  /* ---------- Sidebar ---------- */
+  .sidebar{
+    border-right: 1px solid var(--border);
+    background: var(--surface);
+    display: flex;
+    flex-direction: column;
+    min-height: 100vh;
+    position: sticky;
+    top: 0;
+    align-self: start;
+    max-height: 100vh;
+  }
+  .sidebar-head{
+    padding: 20px 18px 14px;
+    border-bottom: 1px solid var(--border);
+  }
+  .brand-eyebrow{
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 10.5px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--amber);
+    margin: 0 0 4px;
+  }
+  .brand-title{
+    font-family: "Fraunces", Georgia, serif;
+    font-weight: 700;
+    font-size: 21px;
+    margin: 0 0 2px;
+    line-height: 1.15;
+    text-wrap: balance;
+  }
+  .brand-sub{
+    font-size: 12px;
+    color: var(--text-dim);
+    margin: 0;
+  }
+  .search-wrap{
+    padding: 12px 14px;
+    border-bottom: 1px solid var(--border);
+  }
+  .search-input{
+    width: 100%;
+    padding: 8px 10px;
+    border-radius: 7px;
+    border: 1px solid var(--border-strong);
+    background: var(--surface-alt);
+    color: var(--text);
+    font-family: "Literata", serif;
+    font-size: 13.5px;
+  }
+  .search-input:focus{
+    outline: 2px solid var(--accent);
+    outline-offset: 1px;
+  }
+  .source-panel{
+    border-bottom: 1px solid var(--border);
+    background: var(--surface-alt);
+  }
+  .source-toggle{
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    width: 100%;
+    background: none;
+    border: none;
+    text-align: left;
+    padding: 9px 14px;
+    cursor: pointer;
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 11px;
+    color: var(--text-dim);
+  }
+  .source-toggle:hover{ color: var(--text); }
+  .source-toggle-current{
+    color: var(--text-faint);
+    font-style: italic;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    max-width: 120px;
+  }
+  .source-body{
+    padding: 4px 14px 14px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .source-label{
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 10px;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--text-faint);
+  }
+  .source-actions{
+    display: flex;
+    gap: 8px;
+  }
+  .source-actions button{
+    flex: 1;
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 11.5px;
+    padding: 7px 8px;
+    border-radius: 7px;
+    border: 1px solid var(--border-strong);
+    background: var(--accent);
+    color: var(--accent-contrast);
+    cursor: pointer;
+  }
+  .source-actions button.ghost{
+    background: none;
+    color: var(--text-dim);
+  }
+  .source-status{
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 11px;
+    line-height: 1.5;
+    color: var(--text-faint);
+    margin: 0;
+  }
+  .source-status.ok{ color: var(--good); }
+  .source-status.err{ color: var(--miss); }
+
+  .stats-line{
+    padding: 8px 14px;
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 10.5px;
+    color: var(--text-faint);
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    justify-content: space-between;
+  }
+  .card-list{
+    flex: 1;
+    overflow-y: auto;
+    padding: 6px 0 24px;
+  }
+  .set-group{ margin-bottom: 2px; }
+  .set-header{
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+    background: none;
+    border: none;
+    text-align: left;
+    padding: 9px 14px;
+    cursor: pointer;
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 11px;
+    letter-spacing: 0.03em;
+    color: var(--text-dim);
+    text-transform: uppercase;
+  }
+  .set-header:hover{ color: var(--text); }
+  .set-header .chev{
+    transition: transform 0.15s ease;
+    font-size: 9px;
+    color: var(--text-faint);
+    flex-shrink: 0;
+  }
+  .set-group.collapsed .chev{ transform: rotate(-90deg); }
+  .set-header .count{
+    margin-left: auto;
+    color: var(--text-faint);
+  }
+  .set-cards{ }
+  .set-group.collapsed .set-cards{ display: none; }
+  .card-item{
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+    width: 100%;
+    background: none;
+    border: none;
+    text-align: left;
+    padding: 6px 14px 6px 26px;
+    cursor: pointer;
+    font-family: "Literata", serif;
+    font-size: 13.5px;
+    color: var(--text);
+    border-left: 2px solid transparent;
+  }
+  .card-item:hover{ background: var(--surface-alt); }
+  .card-item.active{
+    background: var(--accent-soft);
+    border-left-color: var(--accent);
+  }
+  .card-item .cname{
+    flex: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .dot{
+    width: 6px; height: 6px; border-radius: 50%;
+    flex-shrink: 0;
+    background: var(--good);
+  }
+  .dot.miss{ background: var(--miss); }
+  .empty-msg{
+    padding: 24px 16px;
+    color: var(--text-faint);
+    font-size: 13px;
+    font-family: "IBM Plex Mono", monospace;
+  }
+
+  /* ---------- Main ---------- */
+  .main{
+    padding: 30px 40px 60px;
+    max-width: 1180px;
+  }
+  .topbar{
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 24px;
+    margin-bottom: 22px;
+    flex-wrap: wrap;
+  }
+  .breadcrumb{
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 11px;
+    color: var(--text-faint);
+    letter-spacing: 0.03em;
+    text-transform: uppercase;
+    margin: 0 0 6px;
+  }
+  .card-title-row{
+    display: flex;
+    align-items: baseline;
+    gap: 12px;
+    flex-wrap: wrap;
+  }
+  .card-title{
+    font-family: "Fraunces", Georgia, serif;
+    font-weight: 700;
+    font-size: 30px;
+    margin: 0;
+    text-wrap: balance;
+  }
+  .type-badge{
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 10.5px;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    padding: 3px 9px;
+    border-radius: 999px;
+    background: var(--amber-soft);
+    color: var(--amber);
+    white-space: nowrap;
+  }
+
+  .lang-toggle{
+    display: inline-flex;
+    border: 1px solid var(--border-strong);
+    border-radius: 999px;
+    padding: 3px;
+    background: var(--surface-alt);
+    gap: 2px;
+    flex-shrink: 0;
+  }
+  .lang-toggle button{
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 12px;
+    letter-spacing: 0.03em;
+    padding: 6px 14px;
+    border-radius: 999px;
+    border: none;
+    background: none;
+    color: var(--text-dim);
+    cursor: pointer;
+  }
+  .lang-toggle button.active{
+    background: var(--accent);
+    color: var(--accent-contrast);
+  }
+
+  .meta-strip{
+    display: flex;
+    gap: 18px;
+    flex-wrap: wrap;
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 11.5px;
+    color: var(--text-dim);
+    margin: 10px 0 26px;
+    padding-bottom: 18px;
+    border-bottom: 1px solid var(--border);
+  }
+  .meta-strip b{ color: var(--text); font-weight: 500; }
+
+  .side-face{
+    margin-bottom: 34px;
+  }
+  .side-face-label{
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 11px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--text-faint);
+    margin: 0 0 10px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .side-face-label::after{
+    content: "";
+    flex: 1;
+    height: 1px;
+    background: var(--border);
+  }
+
+  .compare-grid{
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 18px;
+    align-items: stretch;
+  }
+  .compare-grid.single{ grid-template-columns: 1fr 1fr; }
+  @media (max-width: 760px){
+    .compare-grid{ grid-template-columns: 1fr; }
+  }
+
+  .panel{
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 18px 20px;
+    box-shadow: var(--shadow);
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+  .panel.orig{ border-top: 3px solid var(--text-faint); }
+  .panel.lang-slot-0{ border-top: 3px solid var(--amber); }
+  .panel.lang-slot-1{ border-top: 3px solid var(--accent); }
+  .panel.lang-slot-2{ border-top: 3px solid var(--good); }
+  .panel.lang-slot-3{ border-top: 3px solid var(--miss); }
+  .panel-head{
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+  }
+  .panel-lang{
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 10.5px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--text-faint);
+  }
+  .panel-missing-tag{
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 10px;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--miss);
+    background: var(--miss-soft);
+    padding: 2px 8px;
+    border-radius: 999px;
+  }
+  .field-block + .field-block{
+    padding-top: 10px;
+    border-top: 1px dashed var(--border);
+  }
+  .field-label{
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 10px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--text-faint);
+    margin: 0 0 4px;
+  }
+  .field-name{
+    font-family: "Fraunces", Georgia, serif;
+    font-weight: 600;
+    font-size: 18px;
+    margin: 0;
+  }
+  .field-traits{
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 12px;
+    color: var(--accent);
+  }
+  .field-text{
+    font-size: 15px;
+    line-height: 1.55;
+    color: var(--text);
+  }
+  .field-text .icon{
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 10.5px;
+    text-transform: uppercase;
+    letter-spacing: 0.02em;
+    background: var(--accent-soft);
+    color: var(--accent);
+    padding: 1px 6px;
+    border-radius: 4px;
+    white-space: nowrap;
+  }
+  .field-flavor{
+    font-style: italic;
+    color: var(--text-dim);
+    font-size: 13.5px;
+    line-height: 1.5;
+  }
+  .field-empty{
+    color: var(--text-faint);
+    font-size: 13px;
+    font-style: italic;
+  }
+  .center-block{ text-align: center; }
+
+  .welcome{
+    padding: 60px 20px;
+    text-align: center;
+    color: var(--text-dim);
+  }
+  .welcome h2{
+    font-family: "Fraunces", serif;
+    color: var(--text);
+  }
+
+  a{ color: var(--accent); }
+
+  ::-webkit-scrollbar{ width: 10px; height: 10px; }
+  ::-webkit-scrollbar-track{ background: transparent; }
+  ::-webkit-scrollbar-thumb{ background: var(--border-strong); border-radius: 6px; }
+
+  @media (max-width: 640px){
+    .app{ grid-template-columns: 1fr; }
+    .sidebar{ position: relative; max-height: none; min-height: auto; }
+    .main{ padding: 22px 18px 40px; }
+    .card-title{ font-size: 24px; }
+  }
+</style>
+</head>
+<body>
+
+<div class="app">
+  <aside class="sidebar">
+    <div class="sidebar-head">
+      <p class="brand-eyebrow">Dossier de comparaison</p>
+      <h1 class="brand-title" id="projectTitle">Dark Matter</h1>
+      <p class="brand-sub">Original ↔ traductions, carte par carte</p>
+    </div>
+    <div class="source-panel">
+      <button class="source-toggle" id="sourceToggle" type="button">
+        <span>⚙ Source des données</span>
+        <span class="source-toggle-current" id="sourceModeLabel">fichiers locaux</span>
+      </button>
+      <div class="source-body" id="sourceBody" hidden>
+        <label class="source-label" for="sourceInput">Dossier ou dépôt GitHub</label>
+        <input class="search-input" id="sourceInput" type="text" autocomplete="off"
+               placeholder="https://github.com/owner/repo/tree/main/dossier">
+        <div class="source-actions">
+          <button type="button" id="sourceLoadBtn">Charger</button>
+          <button type="button" id="sourceLocalBtn" class="ghost">Fichiers locaux</button>
+        </div>
+        <p class="source-status" id="sourceStatus"></p>
+      </div>
+    </div>
+    <div class="search-wrap">
+      <input class="search-input" id="searchInput" type="text" placeholder="Rechercher une carte…" autocomplete="off">
+    </div>
+    <div class="stats-line">
+      <span id="statTotal">— cartes</span>
+      <span id="statFiltered"></span>
+    </div>
+    <nav class="card-list" id="cardList"></nav>
+  </aside>
+
+  <main class="main" id="main">
+    <div class="welcome">
+      <h2>Chargement…</h2>
+      <p>Récupération des fichiers de projet et de traduction.</p>
+    </div>
+  </main>
+</div>
+
+<script>
+/* ==========================================================================
+   CONFIGURATION PAR DÉFAUT (mode "fichiers locaux")
+   Utilisée quand aucune source GitHub n'est choisie dans le panneau
+   "Source des données". Dans ce mode les fichiers doivent être déposés à
+   côté de index.html avec ces noms.
+   ========================================================================== */
+const LOCAL_PROJECT_FILE = "project.json";
+const LOCAL_LANGS = [
+  { code: "de", file: "project_de.json" },
+  { code: "fr", file: "project_fr.json" }
+];
+/* ========================================================================== */
+
+(function(){
+  const PALETTE = ["amber", "accent", "good", "miss"]; // couleurs cycliques par langue (voir CSS .lang-slot-N)
+  const LANG_BY_CODE = {};
+  let LANGS = [];
+
+  function setLangs(langs){
+    LANGS = langs;
+    LANGS.forEach(function(L, i){ L.slot = i % PALETTE.length; L.cls = "lang-slot-" + L.slot; });
+    Object.keys(LANG_BY_CODE).forEach(function(k){ delete LANG_BY_CODE[k]; });
+    LANGS.forEach(function(L){ LANG_BY_CODE[L.code] = L; });
+    if(!state.lang || !LANG_BY_CODE[state.lang]){
+      state.lang = LANGS[0] ? LANGS[0].code : null;
+    }
+  }
+
+  function languageLabel(code){
+    try{
+      const dn = new Intl.DisplayNames(["fr"], { type: "language" });
+      const name = dn.of(code);
+      if(name && name.toLowerCase() !== code.toLowerCase()){
+        return name.charAt(0).toUpperCase() + name.slice(1);
+      }
+    } catch(e){ /* Intl.DisplayNames indisponible : on retombe sur la table ci-dessous */ }
+    const FALLBACK = {
+      de: "Allemand", fr: "Français", en: "Anglais", es: "Espagnol", it: "Italien",
+      pt: "Portugais", nl: "Néerlandais", pl: "Polonais", ru: "Russe", ja: "Japonais",
+      zh: "Chinois", ko: "Coréen", sv: "Suédois", cs: "Tchèque", hu: "Hongrois"
+    };
+    return FALLBACK[code] || code.toUpperCase();
+  }
+
+  const state = {
+    lang: null,
+    allMode: false,
+    activeId: null,
+    filter: "",
+    collapsed: new Set(),
+    sourceMode: "local", // "local" | "github"
+    sourceUrl: ""
+  };
+
+  let CARD_DATA = { project_name: "", cards: [] };
+
+  function escapeHtml(s){
+    return s.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+  }
+
+  function formatCardText(raw){
+    if(!raw) return "";
+    let s = escapeHtml(String(raw));
+
+    // paired formatting tags
+    s = s.replace(/&lt;b&gt;([\s\S]*?)&lt;\/b&gt;/gi, "<strong>$1</strong>");
+    s = s.replace(/&lt;i&gt;([\s\S]*?)&lt;\/i&gt;/gi, "<em>$1</em>");
+    s = s.replace(/&lt;u&gt;([\s\S]*?)&lt;\/u&gt;/gi, "<u>$1</u>");
+    s = s.replace(/&lt;center&gt;([\s\S]*?)&lt;\/center&gt;/gi, '<span class="center-block">$1</span>');
+    s = s.replace(/&lt;family[^&]*?&gt;([\s\S]*?)&lt;\/family&gt;/gi, "$1");
+    s = s.replace(/&lt;t&gt;([\s\S]*?)&lt;\/t&gt;/gi, "<em>$1</em>");
+
+    // line breaks
+    s = s.replace(/&lt;br&gt;/gi, "<br>");
+    s = s.replace(/\n/g, "<br>");
+
+    // remaining single icon-style tags: <willpower>, <rev>, <exn>, <wil> etc.
+    s = s.replace(/&lt;\/?([a-zA-Z_][a-zA-Z0-9_]*)(?:\s+&quot;[^&]*&quot;)?\s*&gt;/g, function(_, name){
+      const n = name.toLowerCase();
+      if(["b","i","u","center","family","t","br"].includes(n)) return "";
+      return '<span class="icon">' + n.replace(/_/g," ") + "</span>";
+    });
+
+    return s;
+  }
+
+  function fieldBlock(label, value, opts){
+    opts = opts || {};
+    if(!value){
+      return '<div class="field-block"><p class="field-label">' + label + '</p><p class="field-empty">' + (opts.emptyText || "—") + "</p></div>";
+    }
+    let cls = opts.cls || "field-text";
+    let content = opts.raw ? escapeHtml(value) : formatCardText(value);
+    let tag = opts.big ? "h3" : "p";
+    return '<div class="field-block"><p class="field-label">' + label + '</p><' + tag + ' class="' + cls + '">' + content + "</" + tag + "></div>";
+  }
+
+  function renderSide(sideData, title){
+    const type = sideData.type ? '<p class="field-traits" style="margin-bottom:2px">' + escapeHtml(sideData.type.replace(/_/g," ")) + "</p>" : "";
+    let html = "";
+    if(sideData.name){
+      html += '<h3 class="field-name">' + formatCardText(sideData.name) + "</h3>";
+    }
+    if(sideData.traits){
+      html += '<p class="field-traits">' + formatCardText(sideData.traits) + "</p>";
+    }
+    if(sideData.text){
+      html += '<div class="field-text">' + formatCardText(sideData.text) + "</div>";
+    }
+    if(sideData.flavor_text){
+      html += '<div class="field-flavor">' + formatCardText(sideData.flavor_text) + "</div>";
+    }
+    if(!html) html = '<p class="field-empty">Aucun texte sur cette face.</p>';
+    return html;
+  }
+
+  function hasContent(side){
+    return !!(side && (side.name || side.text || side.traits || side.flavor_text));
+  }
+
+  function facePanel(isOrig, L, faceOrig, faceTrans, present){
+    const label = isOrig ? "Original (EN)" : L.label;
+    const cls = isOrig ? "orig" : L.cls;
+    let missTag = "";
+    if(!isOrig && !present){
+      missTag = '<span class="panel-missing-tag">non traduite</span>';
+    }
+    let body;
+    if(!isOrig && !hasContent(faceTrans)){
+      body = '<p class="field-empty">' + (present ? "Aucune surcharge de texte pour cette langue (le texte original s'applique)." : "Carte absente du fichier de traduction.") + "</p>";
+    } else {
+      body = renderSide(isOrig ? faceOrig : faceTrans);
+    }
+    return '<div class="panel ' + cls + '"><div class="panel-head"><span class="panel-lang">' + label + "</span>" + missTag + "</div>" + body + "</div>";
+  }
+
+  function renderFace(faceKey, faceLabel, card){
+    const orig = card[faceKey] || {};
+    if(!hasContent(orig)) return "";
+    let panels = facePanel(true, null, orig, null, true);
+    let nCols = 2;
+    if(state.allMode){
+      LANGS.forEach(function(L){
+        const t = card.translations[L.code];
+        panels += facePanel(false, L, orig, t[faceKey], t.present);
+      });
+      nCols = 1 + LANGS.length;
+    } else {
+      const L = LANG_BY_CODE[state.lang];
+      const t = card.translations[state.lang];
+      panels += facePanel(false, L, orig, t[faceKey], t.present);
+    }
+    const cols = "grid-template-columns:repeat(" + nCols + ",1fr)";
+    return '<section class="side-face"><p class="side-face-label">Face ' + faceLabel + "</p>" +
+      '<div class="compare-grid" style="' + cols + '">' + panels + "</div></section>";
+  }
+
+  function renderCard(card){
+    const main = document.getElementById("main");
+    const esName = escapeHtml(card.encounter_set_name || "Cartes joueur");
+    const num = card.project_number ? "#" + card.project_number : "";
+    const enc = card.encounter_number ? "Encounter " + card.encounter_number : "";
+    const type = card.front && card.front.type ? card.front.type.replace(/_/g," ") : "";
+
+    let html = '<div class="topbar">';
+    html += '<div><p class="breadcrumb">' + esName + '</p><div class="card-title-row"><h2 class="card-title">' + escapeHtml(card.name) + '</h2>';
+    if(type) html += '<span class="type-badge">' + escapeHtml(type) + '</span>';
+    html += '</div></div>';
+    html += '<div class="lang-toggle" id="langToggle">';
+    LANGS.forEach(function(L){
+      html += '<button data-mode="' + L.code + '">' + escapeHtml(L.code.toUpperCase()) + '</button>';
+    });
+    if(LANGS.length > 1){
+      html += '<button data-mode="all">Tout</button>';
+    }
+    html += '</div></div>';
+
+    html += '<div class="meta-strip">';
+    if(num) html += '<span><b>N°</b> ' + escapeHtml(num) + '</span>';
+    if(enc) html += '<span><b>Rencontre</b> ' + escapeHtml(enc) + '</span>';
+    LANGS.forEach(function(L){
+      const present = card.translations[L.code].present;
+      html += '<span><b>' + escapeHtml(L.code.toUpperCase()) + '</b> ' +
+        (present ? '<span style="color:var(--good)">traduite</span>' : '<span style="color:var(--miss)">absente</span>') + '</span>';
+    });
+    html += '</div>';
+
+    html += renderFace("front", "avant", card);
+    html += renderFace("back", "arrière", card);
+
+    main.innerHTML = html;
+
+    document.querySelectorAll("#langToggle button").forEach(function(btn){
+      btn.classList.toggle("active", (state.allMode && btn.dataset.mode === "all") || (!state.allMode && btn.dataset.mode === state.lang));
+      btn.addEventListener("click", function(){
+        if(btn.dataset.mode === "all"){ state.allMode = true; }
+        else { state.allMode = false; state.lang = btn.dataset.mode; }
+        renderCard(card);
+      });
+    });
+  }
+
+  function selectCard(id){
+    state.activeId = id;
+    const card = CARD_DATA.cards.find(function(c){ return c.id === id; });
+    if(!card) return;
+    renderCard(card);
+    document.querySelectorAll(".card-item").forEach(function(el){
+      el.classList.toggle("active", el.dataset.id === id);
+    });
+  }
+
+  function cardMatches(card, q){
+    if(!q) return true;
+    q = q.toLowerCase();
+    if(card.name.toLowerCase().includes(q)) return true;
+    for(const L of LANGS){
+      const t = card.translations[L.code];
+      if(t && t.name && t.name.toLowerCase().includes(q)) return true;
+    }
+    if(card.encounter_set_name && card.encounter_set_name.toLowerCase().includes(q)) return true;
+    return false;
+  }
+
+  function buildList(){
+    const q = state.filter.trim();
+    const groups = [];
+    const bySet = new Map();
+    CARD_DATA.cards.forEach(function(card){
+      const key = card.encounter_set_id || "__none__";
+      if(!bySet.has(key)){
+        bySet.set(key, { name: card.encounter_set_name, order: card.order, cards: [] });
+        groups.push(key);
+      }
+      bySet.get(key).cards.push(card);
+    });
+
+    const listEl = document.getElementById("cardList");
+    listEl.innerHTML = "";
+    let totalShown = 0;
+
+    groups.forEach(function(key){
+      const g = bySet.get(key);
+      const filtered = g.cards.filter(function(c){ return cardMatches(c, q); });
+      if(filtered.length === 0) return;
+      totalShown += filtered.length;
+
+      const groupEl = document.createElement("div");
+      groupEl.className = "set-group" + (state.collapsed.has(key) && !q ? " collapsed" : "");
+
+      const header = document.createElement("button");
+      header.className = "set-header";
+      header.innerHTML = '<span class="chev">▾</span><span>' + escapeHtml(g.name) + '</span><span class="count">' + filtered.length + '</span>';
+      header.addEventListener("click", function(){
+        if(state.collapsed.has(key)) state.collapsed.delete(key); else state.collapsed.add(key);
+        buildList();
+      });
+      groupEl.appendChild(header);
+
+      const cardsEl = document.createElement("div");
+      cardsEl.className = "set-cards";
+      filtered.forEach(function(card){
+        const item = document.createElement("button");
+        item.className = "card-item" + (card.id === state.activeId ? " active" : "");
+        item.dataset.id = card.id;
+        const anyMiss = LANGS.some(function(L){ return !card.translations[L.code].present; });
+        const dotClass = anyMiss ? "dot miss" : "dot";
+        item.innerHTML = '<span class="' + dotClass + '"></span><span class="cname">' + escapeHtml(card.name) + '</span>';
+        item.addEventListener("click", function(){ selectCard(card.id); });
+        cardsEl.appendChild(item);
+      });
+      groupEl.appendChild(cardsEl);
+      listEl.appendChild(groupEl);
+    });
+
+    if(totalShown === 0){
+      listEl.innerHTML = '<p class="empty-msg">Aucune carte ne correspond à la recherche.</p>';
+    }
+
+    document.getElementById("statTotal").textContent = CARD_DATA.cards.length + " cartes";
+    document.getElementById("statFiltered").textContent = q ? totalShown + " trouvées" : "";
+  }
+
+  document.getElementById("searchInput").addEventListener("input", function(e){
+    state.filter = e.target.value;
+    buildList();
+  });
+
+  // ---- fusion original + traductions (equivalent JS de build.py) ----
+  function side(obj){
+    const out = {};
+    ["name","text","traits","flavor_text"].forEach(function(k){ if(obj && obj[k]) out[k] = obj[k]; });
+    return out;
+  }
+
+  function mergeData(project, langData){
+    const esOrder = {}, esName = {};
+    (project.encounter_sets || []).forEach(function(e){
+      esOrder[e.id] = (e.order !== undefined) ? e.order : 9999;
+      esName[e.id] = e.name;
+    });
+
+    const cards = (project.cards || []).map(function(c){
+      const esid = c.encounter_set || null;
+      const entry = {
+        id: c.id,
+        encounter_set_id: esid,
+        encounter_set_name: esid ? (esName[esid] || "Set inconnu") : "Cartes joueur / hors campagne",
+        order: (esid && esid in esOrder) ? esOrder[esid] : 9999,
+        project_number: c.project_number || "",
+        encounter_number: c.encounter_number || "",
+        name: c.name || "",
+        front: Object.assign({ type: (c.front && c.front.type) || "" }, side(c.front)),
+        back: Object.assign({ type: (c.back && c.back.type) || "" }, side(c.back)),
+        translations: {}
+      };
+      LANGS.forEach(function(L){
+        const ld = langData[L.code] || { cards: {}, encounter_sets: {} };
+        const tc = (ld.cards || {})[c.id];
+        const tset = esid ? ((ld.encounter_sets || {})[esid] || {}) : {};
+        entry.translations[L.code] = {
+          name: (tc && tc.name) || "",
+          encounter_set_name: tset.name || "",
+          front: side(tc && tc.front),
+          back: side(tc && tc.back),
+          present: !!tc
+        };
+      });
+      return entry;
+    });
+
+    cards.sort(function(a, b){
+      if(a.order !== b.order) return a.order - b.order;
+      const pa = a.project_number || "", pb = b.project_number || "";
+      if(pa !== pb) return pa < pb ? -1 : 1;
+      const ea = a.encounter_number || "", eb = b.encounter_number || "";
+      return ea < eb ? -1 : (ea > eb ? 1 : 0);
+    });
+
+    return { project_name: project.name || "", cards: cards };
+  }
+
+  function showFatalError(message, hint){
+    document.getElementById("main").innerHTML =
+      '<div class="welcome"><h2>Chargement impossible</h2><p>' + escapeHtml(message) + '</p>' +
+      (hint ? '<p style="margin-top:14px;font-family:\'IBM Plex Mono\',monospace;font-size:12px">' + escapeHtml(hint) + '</p>' : '');
+  }
+
+  function setStatus(msg, kind){
+    const el = document.getElementById("sourceStatus");
+    el.textContent = msg || "";
+    el.className = "source-status" + (kind ? " " + kind : "");
+  }
+
+  function afterDataReady(){
+    document.getElementById("projectTitle").textContent = CARD_DATA.project_name || "Comparateur";
+    buildList();
+    if(CARD_DATA.cards.length){
+      document.getElementById("main").innerHTML =
+        '<div class="welcome"><h2>Choisissez une carte</h2>' +
+        '<p>Sélectionnez une carte dans la liste à gauche pour comparer le texte original à sa traduction.</p></div>';
+      state.activeId = null;
+      selectCard(CARD_DATA.cards[0].id);
+    } else {
+      showFatalError("Aucune carte trouvée dans les données chargées.");
+    }
+  }
+
+  /* ---------------- Mode "fichiers locaux" ---------------- */
+
+  async function fetchJson(path){
+    const r = await fetch(path, { cache: "no-cache" });
+    if(!r.ok) throw new Error(path + " → HTTP " + r.status);
+    return r.json();
+  }
+
+  async function loadFromLocal(){
+    document.getElementById("main").innerHTML =
+      '<div class="welcome"><h2>Chargement…</h2><p>Récupération de ' + escapeHtml(LOCAL_PROJECT_FILE) + ' et des traductions.</p></div>';
+    let project;
+    try{
+      project = await fetchJson(LOCAL_PROJECT_FILE);
+    } catch(err){
+      console.error(err);
+      showFatalError(
+        "Impossible de charger " + LOCAL_PROJECT_FILE + " (" + err.message + ").",
+        "Vérifiez que project.json et les fichiers de traduction sont bien déposés à côté de index.html, " +
+        "et que vous ouvrez la page via un serveur web (http/https) plutôt qu'en double-cliquant le fichier."
+      );
+      return;
+    }
+
+    const langs = LOCAL_LANGS.map(function(l){ return { code: l.code, label: languageLabel(l.code) }; });
+    setLangs(langs);
+
+    const langData = {};
+    for(const l of LOCAL_LANGS){
+      try{
+        langData[l.code] = await fetchJson(l.file);
+      } catch(err){
+        console.warn("Traduction '" + l.code + "' indisponible :", err);
+        langData[l.code] = { cards: {}, encounter_sets: {} };
+      }
+    }
+
+    CARD_DATA = mergeData(project, langData);
+    afterDataReady();
+  }
+
+  /* ---------------- Mode "dépôt GitHub" ---------------- */
+
+  function parseGithubSource(input){
+    let s = input.trim();
+    s = s.replace(/^https?:\/\//i, "").replace(/^github\.com\//i, "");
+    s = s.replace(/\/+$/, "");
+    const parts = s.split("/").filter(Boolean);
+    if(parts.length < 2) return null;
+    const owner = parts[0], repo = parts[1].replace(/\.git$/i, "");
+    let branch = null, path = "";
+    if(parts[2] === "tree" && parts[3]){
+      branch = parts[3];
+      path = parts.slice(4).join("/");
+    } else {
+      path = parts.slice(2).join("/");
+    }
+    return { owner: owner, repo: repo, branch: branch, path: path };
+  }
+
+  async function ghJson(url){
+    const r = await fetch(url, { headers: { "Accept": "application/vnd.github+json" } });
+    if(!r.ok){
+      let detail = "HTTP " + r.status;
+      if(r.status === 403) detail += " (limite de requêtes GitHub anonymes atteinte — réessayez dans un moment)";
+      if(r.status === 404) detail += " (introuvable — dépôt privé, branche ou chemin incorrect ?)";
+      throw new Error(url + " → " + detail);
+    }
+    return r.json();
+  }
+
+  function isBaseProjectJson(data){
+    return !!data && Array.isArray(data.cards) && Array.isArray(data.encounter_sets);
+  }
+  function isTranslationJson(data){
+    return !!data && data.cards && typeof data.cards === "object" && !Array.isArray(data.cards)
+      && typeof data.language === "string" && data.language.length > 0;
+  }
+
+  async function loadFromGithub(sourceStr){
+    const parsed = parseGithubSource(sourceStr);
+    if(!parsed){
+      setStatus("URL non reconnue. Exemple : https://github.com/owner/repo/tree/main/dossier", "err");
+      return;
+    }
+
+    setStatus("Résolution de " + parsed.owner + "/" + parsed.repo + "…");
+    document.getElementById("main").innerHTML =
+      '<div class="welcome"><h2>Chargement…</h2><p>Connexion à GitHub (' + escapeHtml(parsed.owner + "/" + parsed.repo) + ')…</p></div>';
+
+    try{
+      let branch = parsed.branch;
+      if(!branch){
+        const repoInfo = await ghJson("https://api.github.com/repos/" + parsed.owner + "/" + parsed.repo);
+        branch = repoInfo.default_branch || "main";
+      }
+
+      setStatus("Analyse du dossier…");
+      const apiPath = "https://api.github.com/repos/" + parsed.owner + "/" + parsed.repo +
+        "/contents/" + parsed.path + "?ref=" + encodeURIComponent(branch);
+      let listing = await ghJson(apiPath);
+      if(!Array.isArray(listing)) listing = [listing];
+
+      const jsonFiles = listing.filter(function(item){
+        return item.type === "file" && /\.json$/i.test(item.name) && item.download_url;
+      });
+      if(jsonFiles.length === 0){
+        setStatus("Aucun fichier .json trouvé dans ce dossier.", "err");
+        showFatalError("Aucun fichier .json trouvé dans " + (parsed.path || "/") + ".");
+        return;
+      }
+
+      setStatus("Téléchargement de " + jsonFiles.length + " fichier(s) JSON…");
+      const contents = await Promise.all(jsonFiles.map(async function(item){
+        try{
+          const res = await fetch(item.download_url, { cache: "no-cache" });
+          if(!res.ok) return { item: item, data: null };
+          return { item: item, data: await res.json() };
+        } catch(e){
+          return { item: item, data: null };
+        }
+      }));
+
+      let project = null, projectFile = null;
+      const translations = [];
+      contents.forEach(function(entry){
+        if(!entry.data) return;
+        if(!project && isBaseProjectJson(entry.data)){
+          project = entry.data;
+          projectFile = entry.item.name;
+        } else if(isTranslationJson(entry.data)){
+          translations.push({ code: entry.data.language, file: entry.item.name, data: entry.data });
+        }
+      });
+
+      if(!project){
+        setStatus("Fichier de projet de base introuvable dans ce dossier.", "err");
+        showFatalError(
+          "Aucun fichier avec la structure d'un export de base (cards en liste + encounter_sets) n'a été trouvé.",
+          "Fichiers .json vus : " + jsonFiles.map(function(f){ return f.name; }).join(", ")
+        );
+        return;
+      }
+
+      const langs = translations.map(function(t){ return { code: t.code, label: languageLabel(t.code) }; });
+      setLangs(langs);
+
+      const langData = {};
+      translations.forEach(function(t){ langData[t.code] = t.data; });
+
+      CARD_DATA = mergeData(project, langData);
+
+      state.sourceMode = "github";
+      state.sourceUrl = sourceStr.trim();
+      try{ localStorage.setItem("dm_source", state.sourceUrl); } catch(e){}
+      const url = new URL(window.location.href);
+      url.searchParams.set("source", state.sourceUrl);
+      window.history.replaceState({}, "", url);
+      document.getElementById("sourceModeLabel").textContent = parsed.owner + "/" + parsed.repo;
+
+      const langSummary = translations.length
+        ? translations.map(function(t){ return languageLabel(t.code) + " (" + t.file + ")"; }).join(", ")
+        : "aucune";
+      setStatus("Chargé : " + projectFile + " + " + translations.length + " traduction(s) — " + langSummary, "ok");
+
+      afterDataReady();
+    } catch(err){
+      console.error(err);
+      setStatus("Échec : " + err.message, "err");
+      showFatalError("Impossible de charger les données depuis GitHub.", String(err.message || err));
+    }
+  }
+
+  /* ---------------- Orchestration ---------------- */
+
+  document.getElementById("sourceToggle").addEventListener("click", function(){
+    const body = document.getElementById("sourceBody");
+    body.hidden = !body.hidden;
+  });
+  document.getElementById("sourceLoadBtn").addEventListener("click", function(){
+    const val = document.getElementById("sourceInput").value;
+    if(val.trim()) loadFromGithub(val);
+  });
+  document.getElementById("sourceInput").addEventListener("keydown", function(e){
+    if(e.key === "Enter"){
+      const val = e.target.value;
+      if(val.trim()) loadFromGithub(val);
+    }
+  });
+  document.getElementById("sourceLocalBtn").addEventListener("click", function(){
+    state.sourceMode = "local";
+    try{ localStorage.removeItem("dm_source"); } catch(e){}
+    const url = new URL(window.location.href);
+    url.searchParams.delete("source");
+    window.history.replaceState({}, "", url);
+    document.getElementById("sourceModeLabel").textContent = "fichiers locaux";
+    setStatus("");
+    loadFromLocal();
+  });
+
+  function init(){
+    let initialSource = null;
+    try{
+      const url = new URL(window.location.href);
+      initialSource = url.searchParams.get("source");
+    } catch(e){}
+    if(!initialSource){
+      try{ initialSource = localStorage.getItem("dm_source"); } catch(e){}
+    }
+
+    if(initialSource){
+      document.getElementById("sourceInput").value = initialSource;
+      document.getElementById("sourceBody").hidden = false;
+      loadFromGithub(initialSource);
+    } else {
+      loadFromLocal();
+    }
+  }
+
+  init();
+})();
+</script>
+</body>
+</html>
