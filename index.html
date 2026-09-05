@@ -505,6 +505,25 @@
   }
   .center-block{ text-align: center; }
 
+  .callout{
+    display: flex;
+    gap: 10px;
+    padding: 12px 16px;
+    border-radius: 9px;
+    font-size: 13.5px;
+    line-height: 1.55;
+  }
+  .callout .glyph{ flex-shrink: 0; font-family: "IBM Plex Mono", monospace; font-weight: 600; }
+  .callout.warn{ background: var(--amber-soft); color: var(--text); }
+  .callout.warn .glyph{ color: var(--amber); }
+  .callout code{
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 0.9em;
+    background: rgba(0,0,0,0.08);
+    padding: 0.05em 0.35em;
+    border-radius: 4px;
+  }
+
   .welcome{
     padding: 60px 20px;
     text-align: center;
@@ -713,17 +732,23 @@ const LOCAL_LANGS = [
     const orig = card[faceKey] || {};
     if(!hasContent(orig)) return "";
     let panels = facePanel(true, null, orig, null, true);
-    let nCols = 2;
-    if(state.allMode){
+    let nCols = 1;
+    if(LANGS.length === 0){
+      // aucune langue détectée : on affiche uniquement l'original, pas de crash.
+      nCols = 1;
+    } else if(state.allMode){
       LANGS.forEach(function(L){
-        const t = card.translations[L.code];
-        panels += facePanel(false, L, orig, t[faceKey], t.present);
+        const t = card.translations[L.code] || {};
+        panels += facePanel(false, L, orig, t[faceKey] || {}, !!t.present);
       });
       nCols = 1 + LANGS.length;
     } else {
       const L = LANG_BY_CODE[state.lang];
-      const t = card.translations[state.lang];
-      panels += facePanel(false, L, orig, t[faceKey], t.present);
+      const t = card.translations[state.lang] || {};
+      if(L){
+        panels += facePanel(false, L, orig, t[faceKey] || {}, !!t.present);
+        nCols = 2;
+      }
     }
     const cols = "grid-template-columns:repeat(" + nCols + ",1fr)";
     return '<section class="side-face"><p class="side-face-label">Face ' + faceLabel + "</p>" +
@@ -741,20 +766,30 @@ const LOCAL_LANGS = [
     html += '<div><p class="breadcrumb">' + esName + '</p><div class="card-title-row"><h2 class="card-title">' + escapeHtml(card.name) + '</h2>';
     if(type) html += '<span class="type-badge">' + escapeHtml(type) + '</span>';
     html += '</div></div>';
-    html += '<div class="lang-toggle" id="langToggle">';
-    LANGS.forEach(function(L){
-      html += '<button data-mode="' + L.code + '">' + escapeHtml(L.code.toUpperCase()) + '</button>';
-    });
-    if(LANGS.length > 1){
-      html += '<button data-mode="all">Tout</button>';
+    if(LANGS.length > 0){
+      html += '<div class="lang-toggle" id="langToggle">';
+      LANGS.forEach(function(L){
+        html += '<button data-mode="' + L.code + '">' + escapeHtml(L.code.toUpperCase()) + '</button>';
+      });
+      if(LANGS.length > 1){
+        html += '<button data-mode="all">Tout</button>';
+      }
+      html += '</div>';
     }
-    html += '</div></div>';
+    html += '</div>';
+
+    if(LANGS.length === 0){
+      html += '<div class="callout warn" style="margin:0 0 18px">' +
+        '<span class="glyph">!</span><span>Aucun fichier de traduction n\'a été détecté dans cette source — seul le texte original est affiché. ' +
+        'Vérifiez dans la console (F12) le détail de classification de chaque fichier .json, ou que vos fichiers de traduction ' +
+        'contiennent bien un champ <code>"language"</code> au niveau racine.</span></div>';
+    }
 
     html += '<div class="meta-strip">';
     if(num) html += '<span><b>N°</b> ' + escapeHtml(num) + '</span>';
     if(enc) html += '<span><b>Rencontre</b> ' + escapeHtml(enc) + '</span>';
     LANGS.forEach(function(L){
-      const present = card.translations[L.code].present;
+      const present = !!(card.translations[L.code] && card.translations[L.code].present);
       html += '<span><b>' + escapeHtml(L.code.toUpperCase()) + '</b> ' +
         (present ? '<span style="color:var(--good)">traduite</span>' : '<span style="color:var(--miss)">absente</span>') + '</span>';
     });
@@ -778,8 +813,22 @@ const LOCAL_LANGS = [
   function selectCard(id){
     state.activeId = id;
     const card = CARD_DATA.cards.find(function(c){ return c.id === id; });
-    if(!card) return;
-    renderCard(card);
+    if(!card){
+      console.warn("[selectCard] Aucune carte trouvée pour id =", id);
+      return;
+    }
+    try{
+      renderCard(card);
+    } catch(err){
+      console.error("[selectCard] Erreur d'affichage pour la carte :", card, err);
+      const main = document.getElementById("main");
+      main.innerHTML =
+        '<div class="welcome"><h2>Erreur d\'affichage</h2>' +
+        '<p>La carte « ' + escapeHtml(card.name || card.id || "?") + ' » n\'a pas pu s\'afficher : ' + escapeHtml(err.message) + '</p>' +
+        '<pre style="text-align:left;white-space:pre-wrap;font-family:\'IBM Plex Mono\',monospace;font-size:11px;background:var(--surface-alt);padding:10px 12px;border-radius:8px;margin-top:14px;max-height:220px;overflow:auto">' +
+        escapeHtml(JSON.stringify(card, null, 2)) + '</pre>' +
+        '<p style="margin-top:10px;font-size:12px">Le détail complet (avec la pile d\'erreur) est aussi dans la console du navigateur (F12 → Console).</p></div>';
+    }
     document.querySelectorAll(".card-item").forEach(function(el){
       el.classList.toggle("active", el.dataset.id === id);
     });
@@ -869,6 +918,7 @@ const LOCAL_LANGS = [
   }
 
   function mergeData(project, langData){
+    console.groupCollapsed("[mergeData] fusion des données");
     const esOrder = {}, esName = {};
     (project.encounter_sets || []).forEach(function(e){
       if(!e || !e.id) return;
@@ -876,14 +926,32 @@ const LOCAL_LANGS = [
       esName[e.id] = e.name;
     });
 
+    // Un index par id est construit une seule fois par langue (pas par carte), en
+    // acceptant que 'cards' / 'encounter_sets' soient un tableau ou un dictionnaire.
+    const langLookups = {};
+    LANGS.forEach(function(L){
+      const ld = langData[L.code] || {};
+      langLookups[L.code] = {
+        cardsById: buildLookupById(ld.cards),
+        setsById: buildLookupById(ld.encounter_sets)
+      };
+      console.log("[mergeData] langue '" + L.code + "' :",
+        Object.keys(langLookups[L.code].cardsById).length, "carte(s) traduite(s) indexée(s)");
+    });
+
     const rawCards = Array.isArray(project.cards) ? project.cards : [];
+    console.log("[mergeData] cartes brutes dans project.cards :", rawCards.length);
     const cards = [];
     let skipped = 0;
 
     rawCards.forEach(function(c, idx){
       // certains exports JSON édités à la main contiennent des entrées vides
       // (null, {} ou sans id) — on les ignore plutôt que de faire planter tout le chargement.
-      if(!c || typeof c !== "object" || !c.id){ skipped++; return; }
+      if(!c || typeof c !== "object" || !c.id){
+        skipped++;
+        console.warn("[mergeData] entrée ignorée à l'index " + idx + " de 'cards' (null, non-objet, ou sans id) :", c);
+        return;
+      }
       try{
         const esid = c.encounter_set || null;
         const entry = {
@@ -899,9 +967,9 @@ const LOCAL_LANGS = [
           translations: {}
         };
         LANGS.forEach(function(L){
-          const ld = langData[L.code] || { cards: {}, encounter_sets: {} };
-          const tc = (ld.cards || {})[c.id];
-          const tset = esid ? ((ld.encounter_sets || {})[esid] || {}) : {};
+          const lookup = langLookups[L.code] || { cardsById: {}, setsById: {} };
+          const tc = lookup.cardsById[c.id];
+          const tset = esid ? (lookup.setsById[esid] || {}) : {};
           entry.translations[L.code] = {
             name: (tc && tc.name) || "",
             encounter_set_name: (tset && tset.name) || "",
@@ -912,10 +980,13 @@ const LOCAL_LANGS = [
         });
         cards.push(entry);
       } catch(e){
-        console.warn("Carte ignorée (index " + idx + " du tableau 'cards') :", e, c);
+        console.warn("[mergeData] carte ignorée (index " + idx + ", id=" + c.id + ", name=" + c.name + ") :", e, c);
         skipped++;
       }
     });
+
+    console.log("[mergeData] terminé :", cards.length, "carte(s) valide(s),", skipped, "ignorée(s)");
+    console.groupEnd();
 
     cards.sort(function(a, b){
       if(a.order !== b.order) return a.order - b.order;
@@ -1030,12 +1101,29 @@ const LOCAL_LANGS = [
     return r.json();
   }
 
-  function isBaseProjectJson(data){
-    return !!data && Array.isArray(data.cards) && Array.isArray(data.encounter_sets);
-  }
+  // La détection se fait d'abord sur le champ "language" (présent dans les exports de
+  // traduction, quelle que soit la forme — liste ou dictionnaire — de "cards"), pour ne
+  // pas dépendre d'une convention précise d'outil d'export.
   function isTranslationJson(data){
-    return !!data && data.cards && typeof data.cards === "object" && !Array.isArray(data.cards)
-      && typeof data.language === "string" && data.language.length > 0;
+    return !!data && typeof data.language === "string" && data.language.length > 0
+      && data.cards && typeof data.cards === "object";
+  }
+  function isBaseProjectJson(data){
+    return !!data && !isTranslationJson(data)
+      && Array.isArray(data.cards) && Array.isArray(data.encounter_sets);
+  }
+
+  // Construit un index par id, que le conteneur source soit un tableau [{id,...}, ...]
+  // ou un dictionnaire {id: {...}} — les deux conventions existent selon l'outil d'export.
+  function buildLookupById(container){
+    const byId = {};
+    if(!container) return byId;
+    if(Array.isArray(container)){
+      container.forEach(function(item){ if(item && item.id) byId[item.id] = item; });
+    } else if(typeof container === "object"){
+      Object.keys(container).forEach(function(k){ byId[k] = container[k]; });
+    }
+    return byId;
   }
 
   async function loadFromGithub(sourceStr){
@@ -1071,36 +1159,62 @@ const LOCAL_LANGS = [
         return;
       }
 
+      console.log("[github] fichiers .json trouvés :", jsonFiles.map(function(f){ return f.name; }));
+
       setStatus("Téléchargement de " + jsonFiles.length + " fichier(s) JSON…");
       const contents = await Promise.all(jsonFiles.map(async function(item){
         try{
           const res = await fetch(item.download_url, { cache: "no-cache" });
-          if(!res.ok) return { item: item, data: null };
+          if(!res.ok){
+            console.warn("[github] " + item.name + " → HTTP " + res.status);
+            return { item: item, data: null };
+          }
           return { item: item, data: await res.json() };
         } catch(e){
+          console.warn("[github] " + item.name + " → erreur de téléchargement/parsing JSON :", e);
           return { item: item, data: null };
         }
       }));
 
       let project = null, projectFile = null;
       const translations = [];
+      console.groupCollapsed("[github] classification des fichiers");
       contents.forEach(function(entry){
-        if(!entry.data) return;
-        if(!project && isBaseProjectJson(entry.data)){
+        if(!entry.data){
+          console.log(entry.item.name, "→ ignoré (téléchargement ou parsing JSON échoué, voir avertissement ci-dessus)");
+          return;
+        }
+        const isBase = isBaseProjectJson(entry.data);
+        const isTrans = isTranslationJson(entry.data);
+        const cardsShape = Array.isArray(entry.data.cards) ? "tableau (" + entry.data.cards.length + ")"
+          : (entry.data.cards && typeof entry.data.cards === "object") ? "dictionnaire (" + Object.keys(entry.data.cards).length + ")"
+          : "absent/invalide";
+        console.log(
+          entry.item.name, "→",
+          isBase ? "PROJET DE BASE" : (isTrans ? "TRADUCTION (langue='" + entry.data.language + "')" : "ignoré (ni base ni traduction reconnue)"),
+          "| cards:", cardsShape,
+          "| language:", entry.data.language || "(absent)",
+          "| encounter_sets:", Array.isArray(entry.data.encounter_sets) ? "tableau" : (entry.data.encounter_sets ? "dictionnaire" : "absent")
+        );
+        if(!project && isBase){
           project = entry.data;
           projectFile = entry.item.name;
-        } else if(isTranslationJson(entry.data)){
+        } else if(isTrans){
           translations.push({ code: entry.data.language, file: entry.item.name, data: entry.data });
         }
       });
+      console.groupEnd();
 
       if(!project){
         setStatus("Fichier de projet de base introuvable dans ce dossier.", "err");
         showFatalError(
           "Aucun fichier avec la structure d'un export de base (cards en liste + encounter_sets) n'a été trouvé.",
-          "Fichiers .json vus : " + jsonFiles.map(function(f){ return f.name; }).join(", ")
+          "Fichiers .json vus : " + jsonFiles.map(function(f){ return f.name; }).join(", ") + " — détail de classification dans la console (F12)."
         );
         return;
+      }
+      if(translations.length === 0){
+        console.warn("[github] Aucun fichier de traduction détecté — vérifiez le détail de classification ci-dessus (chaque fichier doit avoir un champ 'language' au niveau racine).");
       }
 
       const langs = translations.map(function(t){ return { code: t.code, label: languageLabel(t.code) }; });
@@ -1122,7 +1236,8 @@ const LOCAL_LANGS = [
       const langSummary = translations.length
         ? translations.map(function(t){ return languageLabel(t.code) + " (" + t.file + ")"; }).join(", ")
         : "aucune";
-      setStatus("Chargé : " + projectFile + " + " + translations.length + " traduction(s) — " + langSummary, "ok");
+      setStatus("Chargé : " + projectFile + " + " + translations.length + " traduction(s) — " + langSummary,
+        translations.length === 0 ? "err" : "ok");
 
       afterDataReady();
     } catch(err){
