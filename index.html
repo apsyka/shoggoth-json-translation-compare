@@ -327,6 +327,53 @@
     white-space: nowrap;
   }
 
+  .lightbox{
+    position: fixed;
+    inset: 0;
+    z-index: 100;
+    background: rgba(0,0,0,0.82);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 14px;
+    padding: 40px 20px;
+    cursor: zoom-out;
+  }
+  .lightbox[hidden]{ display: none; }
+  .lightbox img{
+    max-width: min(92vw, 1100px);
+    max-height: 78vh;
+    width: auto;
+    height: auto;
+    border-radius: 10px;
+    box-shadow: 0 12px 40px rgba(0,0,0,0.5);
+    cursor: default;
+  }
+  .lightbox-caption{
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 12.5px;
+    color: #eee;
+    cursor: default;
+  }
+  .lightbox-caption a{ color: var(--amber, #e0a94e); }
+  .lightbox-close{
+    position: absolute;
+    top: 18px;
+    right: 24px;
+    font-size: 32px;
+    line-height: 1;
+    background: none;
+    border: none;
+    color: #fff;
+    cursor: pointer;
+    padding: 6px 10px;
+  }
+  .lightbox-close:hover{ color: var(--amber, #e0a94e); }
+
   .filter-row{
     display: flex;
     align-items: center;
@@ -774,6 +821,15 @@
       <p>Récupération des fichiers de projet et de traduction.</p>
     </div>
   </main>
+</div>
+
+<div class="lightbox" id="imageLightbox" hidden>
+  <button type="button" class="lightbox-close" id="lightboxClose" aria-label="Fermer">×</button>
+  <img id="lightboxImg" src="" alt="">
+  <div class="lightbox-caption">
+    <span id="lightboxCaption"></span>
+    <a id="lightboxOpenOriginal" href="#" target="_blank" rel="noopener">Ouvrir sur Drive ↗</a>
+  </div>
 </div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jsdiff/5.2.0/diff.min.js"></script>
@@ -1426,14 +1482,33 @@ const LOCAL_LANGS = [
         ? '<span class="img-num">#' + escapeHtml(f.number) + (f.side === "back" ? " · dos" : "") + '</span>'
         : '<span class="img-num img-num-none">numéro non détecté</span>';
       const activeCls = f.id === state.activeId ? " active" : "";
-      html += '<a class="image-tile' + activeCls + '" id="img-tile-' + escapeHtml(f.id) + '" ' +
-        'href="https://drive.google.com/file/d/' + encodeURIComponent(f.id) + '/view" target="_blank" rel="noopener">' +
+      html += '<button type="button" class="image-tile' + activeCls + '" id="img-tile-' + escapeHtml(f.id) + '" data-id="' + escapeHtml(f.id) + '">' +
         '<img src="' + driveImageUrl(f.id, 400) + '" alt="' + escapeHtml(f.name) + '" loading="lazy">' +
         '<div class="image-tile-meta">' + badge + '<span class="image-tile-name">' + escapeHtml(f.name) + '</span></div>' +
-        '</a>';
+        '</button>';
     });
     html += '</div>';
     main.innerHTML = html;
+  }
+
+  function imageLabel(f){
+    return (f.number ? "#" + f.number + (f.side === "back" ? " (dos)" : "") + " — " : "") + f.name;
+  }
+
+  function openLightbox(id){
+    const f = driveFiles.find(function(x){ return x.id === id; });
+    if(!f) return;
+    document.getElementById("lightboxImg").src = driveImageUrl(f.id, 1600);
+    document.getElementById("lightboxImg").alt = f.name;
+    document.getElementById("lightboxCaption").textContent = imageLabel(f);
+    document.getElementById("lightboxOpenOriginal").href = "https://drive.google.com/file/d/" + encodeURIComponent(f.id) + "/view";
+    document.getElementById("imageLightbox").hidden = false;
+  }
+
+  function closeLightbox(){
+    const box = document.getElementById("imageLightbox");
+    box.hidden = true;
+    document.getElementById("lightboxImg").src = "";
   }
 
   function buildImagesList(){
@@ -1476,8 +1551,7 @@ const LOCAL_LANGS = [
         const item = document.createElement("button");
         item.className = "card-item" + (f.id === state.activeId ? " active" : "");
         item.dataset.id = f.id;
-        const label = (f.number ? "#" + f.number + (f.side === "back" ? " (dos)" : "") + " — " : "") + f.name;
-        item.innerHTML = '<span class="dot"></span><span class="cname">' + escapeHtml(label) + '</span>';
+        item.innerHTML = '<span class="dot"></span><span class="cname">' + escapeHtml(imageLabel(f)) + '</span>';
         item.addEventListener("click", function(){ selectImageFile(f.id); });
         cardsEl.appendChild(item);
       });
@@ -1502,6 +1576,7 @@ const LOCAL_LANGS = [
       tile.classList.add("active");
       tile.scrollIntoView({ behavior: "smooth", block: "center" });
     }
+    openLightbox(id);
   }
 
   function refreshImagesView(){
@@ -2001,6 +2076,19 @@ const LOCAL_LANGS = [
     document.getElementById(id).addEventListener("keydown", function(e){
       if(e.key === "Enter") runDriveLoad();
     });
+  });
+
+  // Clic sur une vignette de la galerie → agrandissement (lightbox), sans quitter la page.
+  document.getElementById("main").addEventListener("click", function(e){
+    const tile = e.target.closest(".image-tile[data-id]");
+    if(tile) openLightbox(tile.dataset.id);
+  });
+  document.getElementById("lightboxClose").addEventListener("click", closeLightbox);
+  document.getElementById("imageLightbox").addEventListener("click", function(e){
+    if(e.target.id === "imageLightbox") closeLightbox();
+  });
+  document.addEventListener("keydown", function(e){
+    if(e.key === "Escape" && !document.getElementById("imageLightbox").hidden) closeLightbox();
   });
 
   document.getElementById("sourceLocalBtn").addEventListener("click", function(){
