@@ -287,6 +287,10 @@
     transition: border-color 0.15s ease;
   }
   .image-tile:hover{ border-color: var(--accent); }
+  .image-tile.active{
+    border-color: var(--accent);
+    box-shadow: 0 0 0 2px var(--accent);
+  }
   .image-tile img{
     width: 100%;
     aspect-ratio: 5 / 7;
@@ -1095,7 +1099,7 @@ const LOCAL_LANGS = [
   document.getElementById("searchInput").addEventListener("input", function(e){
     state.filter = e.target.value;
     if(state.viewMode === "history") buildHistoryList();
-    else if(state.viewMode === "images") renderImagesGallery();
+    else if(state.viewMode === "images") refreshImagesView();
     else buildList();
   });
 
@@ -1393,25 +1397,21 @@ const LOCAL_LANGS = [
     return { total: files.length, withNumber: files.filter(function(f){ return f.number; }).length };
   }
 
+  function imageMatchesFilter(f, q){
+    if(!q) return true;
+    return f.name.toLowerCase().includes(q) || (f.number && f.number.includes(q));
+  }
+
   function renderImagesGallery(){
     const main = document.getElementById("main");
     if(!driveFiles.length){
       main.innerHTML = '<div class="welcome"><h2>Aucune image chargée</h2>' +
         '<p>Renseignez le dossier Google Drive et la clé API ci-dessous, puis cliquez « Charger les images ».</p></div>';
-      document.getElementById("statTotal").textContent = "— images";
-      document.getElementById("statFiltered").textContent = "";
       return;
     }
 
     const q = state.filter.trim().toLowerCase();
-    const filtered = q
-      ? driveFiles.filter(function(f){
-          return f.name.toLowerCase().includes(q) || (f.number && f.number.includes(q));
-        })
-      : driveFiles;
-
-    document.getElementById("statTotal").textContent = driveFiles.length + " image(s)";
-    document.getElementById("statFiltered").textContent = q ? filtered.length + " trouvée(s)" : "";
+    const filtered = driveFiles.filter(function(f){ return imageMatchesFilter(f, q); });
 
     if(!filtered.length){
       main.innerHTML = '<p class="empty-msg">Aucune image ne correspond à la recherche.</p>';
@@ -1425,13 +1425,88 @@ const LOCAL_LANGS = [
       const badge = f.number
         ? '<span class="img-num">#' + escapeHtml(f.number) + (f.side === "back" ? " · dos" : "") + '</span>'
         : '<span class="img-num img-num-none">numéro non détecté</span>';
-      html += '<a class="image-tile" href="https://drive.google.com/file/d/' + encodeURIComponent(f.id) + '/view" target="_blank" rel="noopener">' +
+      const activeCls = f.id === state.activeId ? " active" : "";
+      html += '<a class="image-tile' + activeCls + '" id="img-tile-' + escapeHtml(f.id) + '" ' +
+        'href="https://drive.google.com/file/d/' + encodeURIComponent(f.id) + '/view" target="_blank" rel="noopener">' +
         '<img src="' + driveImageUrl(f.id, 400) + '" alt="' + escapeHtml(f.name) + '" loading="lazy">' +
         '<div class="image-tile-meta">' + badge + '<span class="image-tile-name">' + escapeHtml(f.name) + '</span></div>' +
         '</a>';
     });
     html += '</div>';
     main.innerHTML = html;
+  }
+
+  function buildImagesList(){
+    const q = state.filter.trim().toLowerCase();
+    const listEl = document.getElementById("cardList");
+    listEl.innerHTML = "";
+
+    if(!driveFiles.length){
+      listEl.innerHTML = '<p class="empty-msg">Chargez un dossier Drive ci-dessous pour voir la liste ici.</p>';
+      document.getElementById("statTotal").textContent = "— images";
+      document.getElementById("statFiltered").textContent = "";
+      return;
+    }
+
+    const groups = [
+      { key: "img-with-number", name: "Numéro détecté", items: driveFiles.filter(function(f){ return f.number && imageMatchesFilter(f, q); }) },
+      { key: "img-without-number", name: "Numéro non détecté", items: driveFiles.filter(function(f){ return !f.number && imageMatchesFilter(f, q); }) }
+    ];
+
+    let totalShown = 0;
+    groups.forEach(function(g){
+      if(!g.items.length) return;
+      totalShown += g.items.length;
+
+      const groupEl = document.createElement("div");
+      groupEl.className = "set-group" + (state.collapsed.has(g.key) ? " collapsed" : "");
+
+      const header = document.createElement("button");
+      header.className = "set-header";
+      header.innerHTML = '<span class="chev">▾</span><span>' + escapeHtml(g.name) + '</span><span class="count">' + g.items.length + '</span>';
+      header.addEventListener("click", function(){
+        if(state.collapsed.has(g.key)) state.collapsed.delete(g.key); else state.collapsed.add(g.key);
+        buildImagesList();
+      });
+      groupEl.appendChild(header);
+
+      const cardsEl = document.createElement("div");
+      cardsEl.className = "set-cards";
+      g.items.forEach(function(f){
+        const item = document.createElement("button");
+        item.className = "card-item" + (f.id === state.activeId ? " active" : "");
+        item.dataset.id = f.id;
+        const label = (f.number ? "#" + f.number + (f.side === "back" ? " (dos)" : "") + " — " : "") + f.name;
+        item.innerHTML = '<span class="dot"></span><span class="cname">' + escapeHtml(label) + '</span>';
+        item.addEventListener("click", function(){ selectImageFile(f.id); });
+        cardsEl.appendChild(item);
+      });
+      groupEl.appendChild(cardsEl);
+      listEl.appendChild(groupEl);
+    });
+
+    if(totalShown === 0){
+      listEl.innerHTML = '<p class="empty-msg">Aucune image ne correspond à la recherche.</p>';
+    }
+
+    document.getElementById("statTotal").textContent = driveFiles.length + " image(s)";
+    document.getElementById("statFiltered").textContent = q ? totalShown + " trouvée(s)" : "";
+  }
+
+  function selectImageFile(id){
+    state.activeId = id;
+    buildImagesList();
+    const tile = document.getElementById("img-tile-" + id);
+    if(tile){
+      document.querySelectorAll(".image-tile.active").forEach(function(t){ t.classList.remove("active"); });
+      tile.classList.add("active");
+      tile.scrollIntoView({ behavior: "smooth", block: "center" });
+    }
+  }
+
+  function refreshImagesView(){
+    buildImagesList();
+    renderImagesGallery();
   }
 
   async function loadFromGithub(sourceStr){
@@ -1867,8 +1942,7 @@ const LOCAL_LANGS = [
           '<p>Indiquez ci-dessus le lien GitHub d\'UN fichier de traduction, chargez son historique, choisissez deux commits, puis « Comparer ».</p></div>';
       }
     } else if(mode === "images"){
-      document.getElementById("cardList").innerHTML = "";
-      renderImagesGallery();
+      refreshImagesView();
     } else {
       buildList();
       if(state.activeId){ selectCard(state.activeId); }
@@ -1915,7 +1989,7 @@ const LOCAL_LANGS = [
       const res = await loadDriveImages(folderVal, apiKey);
       statusEl.className = "source-status ok";
       statusEl.textContent = res.total + " image(s) trouvée(s), " + res.withNumber + " avec un numéro détecté.";
-      if(state.viewMode === "images") renderImagesGallery();
+      if(state.viewMode === "images") refreshImagesView();
     } catch(err){
       console.error("[drive]", err);
       statusEl.className = "source-status err";
