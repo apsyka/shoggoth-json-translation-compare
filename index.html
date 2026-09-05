@@ -271,36 +271,57 @@
     margin: -2px 0;
   }
 
-  .vo-block{
-    display: flex;
-    gap: 12px;
-    flex-wrap: wrap;
-    margin: 0 0 22px;
+  .image-grid{
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+    gap: 16px;
   }
-  .vo-thumb{
+  .image-tile{
     display: flex;
     flex-direction: column;
-    align-items: center;
-    gap: 6px;
     text-decoration: none;
-  }
-  .vo-thumb img{
-    width: 130px;
-    height: auto;
-    border-radius: 8px;
     border: 1px solid var(--border-strong);
-    box-shadow: 0 2px 8px rgba(0,0,0,0.18);
+    border-radius: 10px;
+    overflow: hidden;
     background: var(--surface-alt);
+    transition: border-color 0.15s ease;
+  }
+  .image-tile:hover{ border-color: var(--accent); }
+  .image-tile img{
+    width: 100%;
+    aspect-ratio: 5 / 7;
+    object-fit: cover;
     display: block;
+    background: var(--surface);
   }
-  .vo-thumb span{
+  .image-tile-meta{
+    padding: 8px 10px 10px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+  .img-num{
+    align-self: flex-start;
     font-family: "IBM Plex Mono", monospace;
-    font-size: 10px;
-    letter-spacing: 0.04em;
-    text-transform: uppercase;
-    color: var(--text-faint);
+    font-size: 10.5px;
+    letter-spacing: 0.03em;
+    padding: 2px 8px;
+    border-radius: 999px;
+    background: var(--amber-soft);
+    color: var(--amber);
   }
-  .vo-thumb:hover span{ color: var(--accent); }
+  .img-num-none{
+    background: var(--miss-soft, rgba(200,60,60,0.12));
+    color: var(--miss);
+  }
+  .image-tile-name{
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 10.5px;
+    color: var(--text-dim);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
 
   .filter-row{
     display: flex;
@@ -677,6 +698,7 @@
     <div class="view-toggle" id="viewToggle">
       <button data-view="translations" class="active" type="button">Traductions</button>
       <button data-view="history" type="button">Historique</button>
+      <button data-view="images" type="button">Images VO</button>
     </div>
 
     <div class="source-panel" id="translationsSourcePanel">
@@ -715,12 +737,8 @@
       </div>
     </div>
 
-    <div class="source-panel" id="driveImagePanel">
-      <button class="source-toggle" id="driveToggle" type="button">
-        <span>🖼 Images VO (Google Drive)</span>
-        <span class="source-toggle-current" id="driveModeLabel">non configuré</span>
-      </button>
-      <div class="source-body" id="driveBody" hidden>
+    <div class="source-panel" id="driveImagePanel" hidden>
+      <div class="source-body" style="padding-top:12px">
         <label class="source-label" for="driveFolderInput">Dossier Google Drive (lien de partage)</label>
         <input class="search-input" id="driveFolderInput" type="text" autocomplete="off"
                placeholder="https://drive.google.com/drive/folders/…">
@@ -947,8 +965,6 @@ const LOCAL_LANGS = [
     }
     html += '</div>';
 
-    html += renderVoImageBlock(card.project_number);
-
     if(LANGS.length === 0){
       html += '<div class="callout warn" style="margin:0 0 18px">' +
         '<span class="glyph">!</span><span>Aucun fichier de traduction n\'a été détecté dans cette source — seul le texte original est affiché. ' +
@@ -1078,7 +1094,9 @@ const LOCAL_LANGS = [
 
   document.getElementById("searchInput").addEventListener("input", function(e){
     state.filter = e.target.value;
-    if(state.viewMode === "history") buildHistoryList(); else buildList();
+    if(state.viewMode === "history") buildHistoryList();
+    else if(state.viewMode === "images") renderImagesGallery();
+    else buildList();
   });
 
   // ---- fusion original + traductions (equivalent JS de build.py) ----
@@ -1299,12 +1317,14 @@ const LOCAL_LANGS = [
 
   /* ---------------- Images VO (Google Drive) ----------------
      Un dossier Drive public (partage "avec le lien") contenant des scans/exports
-     des cartes imprimées ne fournit pas de texte : on l'utilise juste comme
-     référence visuelle à côté du texte original/traduit. Chaque image est
-     associée à une carte via le nombre en tête de son nom de fichier
-     (ex. "268 Anachronism.jpg" → project_number = "268"). */
+     des cartes imprimées ne fournit pas de texte : cet onglet importe simplement
+     toutes les images du dossier et en fait un listing (galerie), avec le
+     numéro détecté en tête du nom de fichier quand il y en a un
+     (ex. "268 Anachronism.jpg" → numéro "268"). Le matching avec les cartes du
+     JSON viendra dans une étape suivante — pour l'instant c'est juste un
+     import + un classement. */
 
-  let driveImageIndex = {}; // { "<project_number>": { front: fileId, back: fileId } }
+  let driveFiles = []; // [{ id, name, number, side }] trié par numéro puis nom
 
   function parseGoogleDriveFolderId(input){
     const s = (input || "").trim();
@@ -1354,43 +1374,64 @@ const LOCAL_LANGS = [
     const folderId = parseGoogleDriveFolderId(folderInputVal);
     if(!folderId) throw new Error("Lien de dossier Google Drive invalide.");
     if(!apiKey) throw new Error("Clé API Google manquante (voir le README).");
-    const files = await fetchAllDriveFiles(folderId, apiKey);
-    const index = {};
-    let matchedFiles = 0;
-    files.forEach(function(f){
+    const rawFiles = await fetchAllDriveFiles(folderId, apiKey);
+    const files = rawFiles.map(function(f){
       const c = classifyDriveFilename(f.name);
-      if(!c) return;
-      if(!index[c.number]) index[c.number] = {};
-      if(!index[c.number][c.side]){
-        index[c.number][c.side] = f.id;
-        matchedFiles++;
-      }
+      return { id: f.id, name: f.name, number: c ? c.number : null, side: c ? c.side : null };
     });
-    driveImageIndex = index;
+    files.sort(function(a, b){
+      const na = a.number ? parseInt(a.number, 10) : Infinity;
+      const nb = b.number ? parseInt(b.number, 10) : Infinity;
+      if(na !== nb) return na - nb;
+      return a.name.localeCompare(b.name);
+    });
+    driveFiles = files;
     try{
       localStorage.setItem("dm_drive_folder", folderInputVal);
       localStorage.setItem("dm_drive_key", apiKey);
     } catch(e){}
-    return { totalFiles: files.length, matchedFiles: matchedFiles, numbers: Object.keys(index).length };
+    return { total: files.length, withNumber: files.filter(function(f){ return f.number; }).length };
   }
 
-  function renderVoImageBlock(projectNumber){
-    if(!projectNumber) return "";
-    const entry = driveImageIndex[String(projectNumber)];
-    if(!entry) return "";
-    let html = "";
-    if(entry.front){
-      html += '<a class="vo-thumb" href="https://drive.google.com/file/d/' + encodeURIComponent(entry.front) + '/view" target="_blank" rel="noopener">' +
-        '<img src="' + driveImageUrl(entry.front, 600) + '" alt="Carte imprimée VO" loading="lazy">' +
-        '<span>VO imprimée</span></a>';
+  function renderImagesGallery(){
+    const main = document.getElementById("main");
+    if(!driveFiles.length){
+      main.innerHTML = '<div class="welcome"><h2>Aucune image chargée</h2>' +
+        '<p>Renseignez le dossier Google Drive et la clé API ci-dessous, puis cliquez « Charger les images ».</p></div>';
+      document.getElementById("statTotal").textContent = "— images";
+      document.getElementById("statFiltered").textContent = "";
+      return;
     }
-    if(entry.back){
-      html += '<a class="vo-thumb" href="https://drive.google.com/file/d/' + encodeURIComponent(entry.back) + '/view" target="_blank" rel="noopener">' +
-        '<img src="' + driveImageUrl(entry.back, 600) + '" alt="Dos de la carte VO" loading="lazy">' +
-        '<span>VO — dos</span></a>';
+
+    const q = state.filter.trim().toLowerCase();
+    const filtered = q
+      ? driveFiles.filter(function(f){
+          return f.name.toLowerCase().includes(q) || (f.number && f.number.includes(q));
+        })
+      : driveFiles;
+
+    document.getElementById("statTotal").textContent = driveFiles.length + " image(s)";
+    document.getElementById("statFiltered").textContent = q ? filtered.length + " trouvée(s)" : "";
+
+    if(!filtered.length){
+      main.innerHTML = '<p class="empty-msg">Aucune image ne correspond à la recherche.</p>';
+      return;
     }
-    if(!html) return "";
-    return '<div class="vo-block">' + html + '</div>';
+
+    let html = '<div class="topbar"><div><p class="breadcrumb">Google Drive</p>' +
+      '<h2 class="card-title">Images importées</h2></div></div>';
+    html += '<div class="image-grid">';
+    filtered.forEach(function(f){
+      const badge = f.number
+        ? '<span class="img-num">#' + escapeHtml(f.number) + (f.side === "back" ? " · dos" : "") + '</span>'
+        : '<span class="img-num img-num-none">numéro non détecté</span>';
+      html += '<a class="image-tile" href="https://drive.google.com/file/d/' + encodeURIComponent(f.id) + '/view" target="_blank" rel="noopener">' +
+        '<img src="' + driveImageUrl(f.id, 400) + '" alt="' + escapeHtml(f.name) + '" loading="lazy">' +
+        '<div class="image-tile-meta">' + badge + '<span class="image-tile-name">' + escapeHtml(f.name) + '</span></div>' +
+        '</a>';
+    });
+    html += '</div>';
+    main.innerHTML = html;
   }
 
   async function loadFromGithub(sourceStr){
@@ -1716,8 +1757,6 @@ const LOCAL_LANGS = [
       '<span class="type-badge" style="background:var(--' + tok + '-soft, transparent);color:var(--' + tok + ')">' +
       escapeHtml(HISTORY_STATUS_LABEL[row.status] || "") + '</span></div></div></div>';
 
-    html += renderVoImageBlock(row.project_number);
-
     let faces = renderHistoryFace("front", "avant", row) + renderHistoryFace("back", "arrière", row);
     if(!faces){
       faces = '<p class="field-empty">Aucun texte comparable sur cette carte dans les deux versions choisies.</p>';
@@ -1808,6 +1847,7 @@ const LOCAL_LANGS = [
     });
     document.getElementById("translationsSourcePanel").hidden = mode !== "translations";
     document.getElementById("historyPanel").hidden = mode !== "history";
+    document.getElementById("driveImagePanel").hidden = mode !== "images";
     document.getElementById("historyFilterRow").hidden = mode !== "history";
     state.filter = "";
     document.getElementById("searchInput").value = "";
@@ -1826,6 +1866,9 @@ const LOCAL_LANGS = [
           '<div class="welcome"><h2>Comparez deux versions</h2>' +
           '<p>Indiquez ci-dessus le lien GitHub d\'UN fichier de traduction, chargez son historique, choisissez deux commits, puis « Comparer ».</p></div>';
       }
+    } else if(mode === "images"){
+      document.getElementById("cardList").innerHTML = "";
+      renderImagesGallery();
     } else {
       buildList();
       if(state.activeId){ selectCard(state.activeId); }
@@ -1862,18 +1905,6 @@ const LOCAL_LANGS = [
       if(val.trim()) loadFromGithub(val);
     }
   });
-  document.getElementById("driveToggle").addEventListener("click", function(){
-    const body = document.getElementById("driveBody");
-    body.hidden = !body.hidden;
-  });
-
-  function rerenderCurrent(){
-    // Réaffiche la carte active pour prendre en compte les nouvelles images VO.
-    if(!state.activeId) return;
-    if(state.viewMode === "history") selectHistoryRow(state.activeId);
-    else selectCard(state.activeId);
-  }
-
   async function runDriveLoad(){
     const folderVal = document.getElementById("driveFolderInput").value;
     const apiKey = document.getElementById("driveApiKeyInput").value.trim();
@@ -1883,9 +1914,8 @@ const LOCAL_LANGS = [
     try{
       const res = await loadDriveImages(folderVal, apiKey);
       statusEl.className = "source-status ok";
-      statusEl.textContent = res.numbers + " numéro(s) de carte associé(s) sur " + res.totalFiles + " fichier(s) trouvés.";
-      document.getElementById("driveModeLabel").textContent = res.numbers + " cartes";
-      rerenderCurrent();
+      statusEl.textContent = res.total + " image(s) trouvée(s), " + res.withNumber + " avec un numéro détecté.";
+      if(state.viewMode === "images") renderImagesGallery();
     } catch(err){
       console.error("[drive]", err);
       statusEl.className = "source-status err";
