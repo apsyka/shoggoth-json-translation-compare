@@ -432,6 +432,140 @@
     background: rgba(255,255,255,0.05);
     border-radius: 10px;
   }
+  /* ---------- Relecture : barre d'avancement, pastilles, notes ---------- */
+  .review-progress{ padding: 0 14px 10px; }
+  .review-bar{
+    height: 5px;
+    border-radius: 3px;
+    background: var(--border);
+    overflow: hidden;
+  }
+  .review-bar span{
+    display: block;
+    height: 100%;
+    width: 0;
+    background: var(--good);
+    transition: width 0.2s ease;
+  }
+  .review-progress-text{
+    margin: 6px 0 0;
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 10.5px;
+    color: var(--text-faint);
+  }
+  .card-item .dot.rev-ok{ background: var(--good); box-shadow: 0 0 0 2px var(--good-soft); }
+  .card-item .dot.rev-flag{ background: var(--miss); box-shadow: 0 0 0 2px var(--miss-soft); }
+  .card-item .typo-mark{ color: var(--amber); margin-left: 4px; font-size: 11px; }
+  .image-tile.rev-ok{ outline: 2px solid var(--good); }
+  .image-tile.rev-flag{ outline: 2px solid var(--miss); }
+
+  .review-badge{
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 10.5px;
+    padding: 3px 8px;
+    border-radius: 20px;
+    white-space: nowrap;
+  }
+  .review-badge.rev-ok{ background: var(--good-soft); color: var(--good); }
+  .review-badge.rev-flag{ background: var(--miss-soft); color: var(--miss); }
+
+  .lightbox-numbers{
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 11.5px;
+    color: var(--amber);
+    background: var(--amber-soft);
+    border-radius: 6px;
+    padding: 6px 9px;
+    margin: 0 0 12px;
+  }
+  .typo-warnings{
+    border: 1px solid var(--amber);
+    border-left-width: 3px;
+    border-radius: 6px;
+    background: var(--amber-soft);
+    padding: 8px 10px;
+    margin: 0 0 12px;
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 11px;
+    line-height: 1.55;
+  }
+  .typo-warnings p{ margin: 0 0 4px; color: var(--amber); }
+  .typo-warnings ul{ margin: 0; padding-left: 16px; color: var(--text-dim); }
+  .typo-warnings code{
+    background: rgba(0,0,0,0.35);
+    padding: 1px 4px;
+    border-radius: 3px;
+    color: var(--text);
+  }
+  .note-label{
+    display: block;
+    margin-top: 16px;
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 10px;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--text-faint);
+  }
+  .note-input{
+    width: 100%;
+    margin-top: 6px;
+    padding: 8px 10px;
+    border-radius: 7px;
+    border: 1px solid var(--border-strong);
+    background: var(--surface-alt);
+    color: var(--text);
+    font-family: "Literata", serif;
+    font-size: 13px;
+    resize: vertical;
+  }
+  .note-input:focus{ outline: 2px solid var(--accent); outline-offset: 1px; }
+
+  /* ---------- Barre d'outils de l'agrandissement ---------- */
+  .lightbox-toolbar{
+    position: fixed;
+    top: 14px;
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    z-index: 102;
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+  .lb-btn, .lb-faces button{
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 11.5px;
+    padding: 7px 11px;
+    border-radius: 7px;
+    border: 1px solid var(--border-strong);
+    background: var(--surface);
+    color: var(--text-dim);
+    cursor: pointer;
+  }
+  .lb-btn:hover, .lb-faces button:hover{ color: var(--text); border-color: var(--accent); }
+  .lb-faces{ display: flex; gap: 2px; }
+  .lb-faces button:first-child{ border-radius: 7px 0 0 7px; }
+  .lb-faces button:last-child{ border-radius: 0 7px 7px 0; }
+  .lb-faces button.active{ background: var(--accent); border-color: var(--accent); color: var(--accent-contrast); }
+  .lb-faces button[disabled]{ opacity: 0.35; cursor: not-allowed; }
+  .lb-btn.active-ok{ background: var(--good); border-color: var(--good); color: #10231a; }
+  .lb-btn.active-flag{ background: var(--miss); border-color: var(--miss); color: #2a1212; }
+  .lb-btn.active{ background: var(--accent); border-color: var(--accent); color: var(--accent-contrast); }
+
+  /* ---------- Loupe ---------- */
+  .loupe{
+    position: fixed;
+    width: 300px;
+    height: 300px;
+    border-radius: 50%;
+    border: 2px solid var(--accent);
+    box-shadow: 0 10px 40px rgba(0,0,0,0.7);
+    background-repeat: no-repeat;
+    pointer-events: none;
+    z-index: 103;
+  }
+
   .mismatch-banner{
     margin: 0 0 18px;
     padding: 12px 16px;
@@ -975,6 +1109,15 @@
           <button type="button" id="shoggothLoadBtn">Charger les images finales</button>
         </div>
         <p class="source-status" id="shoggothStatus">Optionnel : un dossier Drive avec les images finales exportées depuis Shoggoth, pour les comparer directement au scan à côté (nom de fichier attendu : identifiant de la carte en tête, ex. « 0c287f33-e134-4759-9bc2-7fab82e87a1b_nom_front_1.png »). Réutilise la même clé API que ci-dessus.</p>
+
+        <label class="source-label" style="margin-top:14px">Relecture</label>
+        <div class="source-actions">
+          <button type="button" id="reviewExportBtn">Exporter les cartes signalées (CSV)</button>
+        </div>
+        <div class="source-actions" style="margin-top:6px">
+          <button type="button" id="reviewResetBtn" class="ghost">Réinitialiser la relecture</button>
+        </div>
+        <p class="source-status" id="reviewStatus">Marquez chaque carte relue (touche <b>V</b>) ou à corriger (touche <b>P</b>) pendant que vous comparez ; l'avancement est mémorisé dans ce navigateur, par campagne. L'export reprend les cartes signalées avec vos notes et les alertes typographiques détectées.</p>
       </div>
     </div>
 
@@ -986,10 +1129,21 @@
       <select class="search-input" id="imagesSetFilter" hidden style="margin-top:8px">
         <option value="">Tous les sets de rencontre</option>
       </select>
+      <select class="search-input" id="imagesStatusFilter" hidden style="margin-top:8px">
+        <option value="">Toutes les cartes</option>
+        <option value="todo">À relire (non validées)</option>
+        <option value="ok">Relues</option>
+        <option value="flag">Signalées ⚠</option>
+        <option value="typo">Alerte typographique</option>
+      </select>
     </div>
     <div class="stats-line">
       <span id="statTotal">— cartes</span>
       <span id="statFiltered"></span>
+    </div>
+    <div class="review-progress" id="reviewProgress" hidden>
+      <div class="review-bar"><span id="reviewBarFill"></span></div>
+      <p class="review-progress-text" id="reviewProgressText"></p>
     </div>
     <nav class="card-list" id="cardList"></nav>
   </aside>
@@ -1004,6 +1158,15 @@
 
 <div class="lightbox" id="imageLightbox" hidden>
   <button type="button" class="lightbox-close" id="lightboxClose" aria-label="Fermer">×</button>
+  <div class="lightbox-toolbar" id="lightboxToolbar">
+    <div class="lb-faces" id="lightboxFaces">
+      <button type="button" data-face="front">Recto</button>
+      <button type="button" data-face="back">Verso</button>
+    </div>
+    <button type="button" class="lb-btn" id="lightboxReviewOk" title="Marquer comme relue (V)">✓ Relue</button>
+    <button type="button" class="lb-btn" id="lightboxReviewFlag" title="Signaler à corriger (P)">⚠ À corriger</button>
+    <button type="button" class="lb-btn" id="lightboxLoupeBtn" title="Loupe sur l'image survolée (Z)">🔍 Loupe</button>
+  </div>
   <div class="lightbox-body">
     <div class="lightbox-media">
       <div class="lightbox-img-wrap">
@@ -1028,9 +1191,14 @@
     <div class="lightbox-text" id="lightboxTextPanel" hidden>
       <div class="lightbox-text-head">
         <h3 id="lightboxCardName"></h3>
+        <span class="review-badge" id="lightboxReviewBadge" hidden></span>
       </div>
       <p class="lightbox-text-source" id="lightboxTextSource"></p>
+      <p class="lightbox-numbers" id="lightboxNumbers" hidden></p>
+      <div class="typo-warnings" id="lightboxTypoWarnings" hidden></div>
       <div id="lightboxTextBody"></div>
+      <label class="note-label" for="lightboxNote">Note de relecture</label>
+      <textarea class="note-input" id="lightboxNote" rows="3" placeholder="Ce qui cloche sur cette carte…"></textarea>
     </div>
   </div>
 </div>
@@ -1090,7 +1258,11 @@ const LOCAL_LANGS = [
     sourceMode: "local", // "local" | "github"
     sourceUrl: "",
     viewMode: "translations", // "translations" | "history"
-    imagesSetFilter: "" // filtre par set de rencontre, onglet Images VO
+    imagesSetFilter: "",      // filtre par set de rencontre, onglet Images VO
+    imagesStatusFilter: "",   // "" | "todo" | "ok" | "flag" | "typo"
+    activeGroupKey: null,     // carte en cours dans l'onglet Images VO (une entrée = une carte)
+    activeFace: "front",      // face affichée pour cette carte
+    loupe: false              // loupe active au survol des images agrandies
   };
 
   let CARD_DATA = { project_name: "", cards: [] };
@@ -1467,6 +1639,8 @@ const LOCAL_LANGS = [
 
   function afterDataReady(){
     document.getElementById("projectTitle").textContent = CARD_DATA.project_name || "Comparateur";
+    // Les contrôles typographiques portent sur le project.json qui vient d'être chargé.
+    runTypoChecks();
     if(CARD_DATA.skipped){
       const prev = document.getElementById("sourceStatus").textContent;
       const warn = "⚠ " + CARD_DATA.skipped + " entrée(s) invalide(s) dans 'cards' ignorée(s) (voir la console)";
@@ -1705,7 +1879,9 @@ const LOCAL_LANGS = [
     // Met à jour l'aperçu ouvert (lightbox) sans tout re-rendre.
     if(currentLightboxFileId === fileId) applyLightboxRotation(next);
     // Met à jour la vignette correspondante dans la galerie si elle est affichée.
-    const tileImg = document.querySelector('#img-tile-' + CSS.escape(fileId) + ' img');
+    // Les vignettes sont identifiées par CARTE, pas par fichier : on retrouve l'image par
+    // l'identifiant de fichier porté par la balise <img> elle-même.
+    const tileImg = document.querySelector('.image-tile img[data-file="' + CSS.escape(fileId) + '"]');
     if(tileImg) tileImg.style.transform = next ? "rotate(" + next + "deg)" : "";
   }
 
@@ -1756,8 +1932,14 @@ const LOCAL_LANGS = [
   function loadCampaignScopedState(autoLoad){
     driveFiles = [];
     shoggothFiles = [];
+    cardGroups = [];
+    groupsByKey = {};
     currentLightboxFileId = null;
+    state.activeGroupKey = null;
     state.imagesSetFilter = "";
+    state.imagesStatusFilter = "";
+    // Les statuts de relecture appartiennent à la campagne : on recharge les siens.
+    loadReviewData();
 
     document.getElementById("driveStatus").className = "source-status";
     document.getElementById("driveStatus").textContent = DEFAULT_DRIVE_STATUS;
@@ -1996,6 +2178,229 @@ const LOCAL_LANGS = [
       '</div>';
   }
 
+  /* ==========================================================================
+     SUIVI DE RELECTURE
+     Statut + note par carte, mémorisés dans le navigateur et cloisonnés par
+     campagne (comme la clé API) pour ne pas mélanger deux projets.
+     ========================================================================== */
+
+  let reviewData = {}; // clé de carte -> { status: "ok"|"flag", note: string, ts: number }
+
+  function reviewStorageKey(){ return campaignScopedKey("dm_review"); }
+
+  function loadReviewData(){
+    reviewData = {};
+    try{
+      const raw = localStorage.getItem(reviewStorageKey());
+      if(raw) reviewData = JSON.parse(raw) || {};
+    } catch(e){ reviewData = {}; }
+  }
+
+  function saveReviewData(){
+    try{ localStorage.setItem(reviewStorageKey(), JSON.stringify(reviewData)); } catch(e){}
+  }
+
+  function getReview(key){ return (key && reviewData[key]) || null; }
+
+  function setReviewStatus(key, status){
+    if(!key) return;
+    const entry = reviewData[key] || {};
+    // Recliquer sur le statut déjà posé l'enlève : un aller-retour, pas un cul-de-sac.
+    entry.status = (entry.status === status) ? null : status;
+    entry.ts = Date.now();
+    if(!entry.status && !entry.note) delete reviewData[key];
+    else reviewData[key] = entry;
+    saveReviewData();
+  }
+
+  function setReviewNote(key, note){
+    if(!key) return;
+    const entry = reviewData[key] || {};
+    entry.note = note;
+    entry.ts = Date.now();
+    if(!entry.status && !note) delete reviewData[key];
+    else reviewData[key] = entry;
+    saveReviewData();
+  }
+
+  /* ==========================================================================
+     CONTRÔLES TYPOGRAPHIQUES (français)
+     Passe sur le texte des cartes du project.json chargé et signale les coquilles
+     mécaniques — celles qu'on ne devrait pas avoir à chercher à l'œil sur des
+     centaines d'images.
+     ========================================================================== */
+
+  const TYPO_SENTINEL = "￿";
+  // Les balises Shoggoth (<b>, <image src="…">, <font "…">) sont remplacées par une
+  // sentinelle SANS espace : mettre une espace à la place créerait de faux « double
+  // espace » et de fausses « espaces avant virgule » partout.
+  function typoStrip(v){ return String(v || "").replace(/<[^>]*>/g, TYPO_SENTINEL); }
+
+  const TYPO_RULES = [
+    { id: "ellipsis", label: "« ... » au lieu de « … »", re: /\.\.\./g },
+    { id: "double-space", label: "double espace", re: /\S {2,}\S/g },
+    { id: "space-before-punct", label: "espace manquante avant : ; ! ? »", re: /\w[:;!?»]/g },
+    { id: "space-after-quote", label: "espace manquante après «", re: /«\w/g },
+    { id: "space-before-comma", label: "espace avant une virgule ou un point", re: /[\w»] [,.](\s|$)/g }
+  ];
+
+  let TYPO_BY_CARD = {};       // id de carte -> [{ label, snippet }]
+  let TYPO_DOMINANT_APOS = ""; // apostrophe majoritaire du projet
+
+  function typoFields(card){
+    const out = [];
+    ["front", "back"].forEach(function(face){
+      const f = card[face] || {};
+      ["name", "text", "flavor_text", "traits", "victory"].forEach(function(key){
+        if(typeof f[key] === "string" && f[key].trim()) out.push({ face: face, key: key, value: f[key] });
+      });
+    });
+    return out;
+  }
+
+  function typoSnippet(text, start, end){
+    const s = text.slice(Math.max(0, start - 28), Math.min(text.length, end + 16));
+    return s.replace(new RegExp(TYPO_SENTINEL, "g"), "⟨balise⟩").replace(/\s+/g, " ").trim();
+  }
+
+  function runTypoChecks(){
+    TYPO_BY_CARD = {};
+    let straight = 0, curly = 0;
+    CARD_DATA.cards.forEach(function(card){
+      typoFields(card).forEach(function(fld){
+        const t = typoStrip(fld.value);
+        straight += (t.match(/'/g) || []).length;
+        curly += (t.match(/’/g) || []).length;
+      });
+    });
+    TYPO_DOMINANT_APOS = curly > straight ? "’" : "'";
+    const minorityApos = TYPO_DOMINANT_APOS === "'" ? "’" : "'";
+
+    CARD_DATA.cards.forEach(function(card){
+      const found = [];
+      typoFields(card).forEach(function(fld){
+        const t = typoStrip(fld.value);
+        TYPO_RULES.forEach(function(rule){
+          rule.re.lastIndex = 0;
+          let m;
+          while((m = rule.re.exec(t)) !== null){
+            found.push({ label: rule.label, snippet: typoSnippet(t, m.index, m.index + m[0].length) });
+            break; // une occurrence par règle et par champ suffit à attirer l'œil
+          }
+        });
+        const idx = t.indexOf(minorityApos);
+        if(idx !== -1){
+          found.push({
+            label: "apostrophe « " + minorityApos + " » alors que le projet utilise « " + TYPO_DOMINANT_APOS + " »",
+            snippet: typoSnippet(t, idx, idx + 1)
+          });
+        }
+      });
+      if(found.length) TYPO_BY_CARD[card.id] = found;
+    });
+    return { cards: Object.keys(TYPO_BY_CARD).length };
+  }
+
+  function typoIssuesForCard(card){ return (card && TYPO_BY_CARD[card.id]) || null; }
+
+  /* ==========================================================================
+     REGROUPEMENT PAR CARTE
+     Une entrée = une carte (recto + verso), au lieu d'une entrée par image :
+     deux fois moins d'étapes à parcourir, et la carte se lit d'un bloc.
+     ========================================================================== */
+
+  let cardGroups = [];
+  let groupsByKey = {};
+
+  function buildCardGroups(){
+    cardGroups = [];
+    groupsByKey = {};
+    driveFiles.forEach(function(f){
+      const card = findCardByDriveNumber(f);
+      const key = card ? ("card:" + card.id) : ("file:" + f.id);
+      let g = groupsByKey[key];
+      if(!g){
+        g = { key: key, card: card, number: f.number, files: [], front: null, back: null };
+        groupsByKey[key] = g;
+        cardGroups.push(g);
+      }
+      g.files.push(f);
+      if(f.side === "back"){ if(!g.back) g.back = f; }
+      else if(!g.front) g.front = f;
+    });
+    // Un groupe sans recto identifié affiche quand même sa première image.
+    cardGroups.forEach(function(g){ if(!g.front) g.front = g.files[0]; });
+    return cardGroups;
+  }
+
+  function groupLabel(g){
+    const num = g.number ? "#" + g.number + " — " : "";
+    if(g.card) return num + (g.card.name || "");
+    return num + (g.front ? g.front.name : "");
+  }
+
+  function groupFile(g, face){
+    if(!g) return null;
+    if(face === "back") return g.back || g.front;
+    return g.front || g.back;
+  }
+
+  function groupHasFace(g, face){ return face === "back" ? !!g.back : !!g.front; }
+
+  function groupMatchesSearch(g, q){
+    if(!q) return true;
+    if(g.number && g.number.includes(q)) return true;
+    if(g.card && (g.card.name || "").toLowerCase().includes(q)) return true;
+    if(g.card && (g.card.encounter_set_name || "").toLowerCase().includes(q)) return true;
+    return g.files.some(function(f){ return f.name.toLowerCase().includes(q); });
+  }
+
+  function groupPassesSetFilter(g){
+    if(!state.imagesSetFilter) return true;
+    return (g.card && g.card.encounter_set_name) === state.imagesSetFilter;
+  }
+
+  function groupPassesStatusFilter(g){
+    const mode = state.imagesStatusFilter;
+    if(!mode) return true;
+    const rev = getReview(g.key);
+    if(mode === "ok") return !!rev && rev.status === "ok";
+    if(mode === "flag") return !!rev && rev.status === "flag";
+    if(mode === "todo") return !rev || rev.status !== "ok";
+    if(mode === "typo") return !!typoIssuesForCard(g.card);
+    return true;
+  }
+
+  function visibleGroups(){
+    const q = state.filter.trim().toLowerCase();
+    return cardGroups.filter(function(g){
+      return groupMatchesSearch(g, q) && groupPassesSetFilter(g) && groupPassesStatusFilter(g);
+    });
+  }
+
+  function reviewStats(){
+    let ok = 0, flag = 0, typo = 0;
+    cardGroups.forEach(function(g){
+      const rev = getReview(g.key);
+      if(rev && rev.status === "ok") ok++;
+      else if(rev && rev.status === "flag") flag++;
+      if(typoIssuesForCard(g.card)) typo++;
+    });
+    return { total: cardGroups.length, ok: ok, flag: flag, typo: typo };
+  }
+
+  function renderReviewProgress(){
+    const box = document.getElementById("reviewProgress");
+    if(state.viewMode !== "images" || !cardGroups.length){ box.hidden = true; return; }
+    const s = reviewStats();
+    box.hidden = false;
+    const pct = s.total ? Math.round((s.ok / s.total) * 100) : 0;
+    document.getElementById("reviewBarFill").style.width = pct + "%";
+    document.getElementById("reviewProgressText").textContent =
+      s.ok + " / " + s.total + " relue(s) · " + s.flag + " signalée(s)" +
+      (s.typo ? " · " + s.typo + " alerte(s) typo" : "");
+  }
+
   function imageMatchesFilter(f, q){
     if(!q) return true;
     return f.name.toLowerCase().includes(q) || (f.number && f.number.includes(q));
@@ -2025,6 +2430,140 @@ const LOCAL_LANGS = [
     sel.hidden = false;
   }
 
+  function populateImagesStatusFilter(){
+    const sel = document.getElementById("imagesStatusFilter");
+    sel.hidden = !cardGroups.length;
+    if(sel.value !== state.imagesStatusFilter) sel.value = state.imagesStatusFilter;
+  }
+
+  /* ---------------- Boutons de relecture + note ---------------- */
+
+  function renderReviewControls(g){
+    const rev = getReview(g.key);
+    const status = rev ? rev.status : null;
+    const okBtn = document.getElementById("lightboxReviewOk");
+    const flagBtn = document.getElementById("lightboxReviewFlag");
+    okBtn.classList.toggle("active-ok", status === "ok");
+    flagBtn.classList.toggle("active-flag", status === "flag");
+
+    const badge = document.getElementById("lightboxReviewBadge");
+    badge.className = "review-badge" + (status === "ok" ? " rev-ok" : status === "flag" ? " rev-flag" : "");
+    badge.hidden = !status;
+    badge.textContent = status === "ok" ? "✓ relue" : status === "flag" ? "⚠ à corriger" : "";
+
+    const note = document.getElementById("lightboxNote");
+    if(document.activeElement !== note) note.value = (rev && rev.note) || "";
+  }
+
+  function toggleReviewStatus(status){
+    const g = groupsByKey[state.activeGroupKey];
+    if(!g) return;
+    setReviewStatus(g.key, status);
+    renderReviewControls(g);
+    buildImagesList();
+    renderImagesGallery();
+  }
+
+  /* ---------------- Loupe (zoom au survol) ---------------- */
+
+  let loupeEl = null;
+  const LOUPE_SIZE = 300;
+  const LOUPE_ZOOM = 2.4;
+
+  function hideLoupe(){ if(loupeEl) loupeEl.hidden = true; }
+
+  function updateLoupeSource(){ /* la source est relue à chaque mouvement, rien à pré-calculer */ }
+
+  function ensureLoupe(){
+    if(loupeEl) return loupeEl;
+    loupeEl = document.createElement("div");
+    loupeEl.className = "loupe";
+    loupeEl.hidden = true;
+    document.body.appendChild(loupeEl);
+    return loupeEl;
+  }
+
+  function moveLoupe(e){
+    if(!state.loupe || document.getElementById("imageLightbox").hidden) return hideLoupe();
+    const img = e.target;
+    if(!img || img.tagName !== "IMG" || !img.closest(".lightbox-img-wrap")) return hideLoupe();
+    // Une image pivotée fausserait la position du grossissement : on s'abstient plutôt
+    // que d'afficher une zone qui ne correspond pas à ce que le curseur désigne.
+    const rotated = (img.style.transform || "").indexOf("rotate") !== -1 &&
+                    (img.style.transform || "").indexOf("rotate(0deg)") === -1;
+    if(rotated) return hideLoupe();
+
+    const rect = img.getBoundingClientRect();
+    const el = ensureLoupe();
+    const relX = (e.clientX - rect.left) / rect.width;
+    const relY = (e.clientY - rect.top) / rect.height;
+    if(relX < 0 || relX > 1 || relY < 0 || relY > 1) return hideLoupe();
+
+    const bgW = rect.width * LOUPE_ZOOM;
+    const bgH = rect.height * LOUPE_ZOOM;
+    el.hidden = false;
+    el.style.backgroundImage = 'url("' + img.src + '")';
+    el.style.backgroundSize = bgW + "px " + bgH + "px";
+    el.style.backgroundPosition = (-(relX * bgW - LOUPE_SIZE / 2)) + "px " + (-(relY * bgH - LOUPE_SIZE / 2)) + "px";
+    el.style.left = (e.clientX - LOUPE_SIZE / 2) + "px";
+    el.style.top = (e.clientY - LOUPE_SIZE / 2) + "px";
+  }
+
+  function setLoupe(on){
+    state.loupe = on;
+    document.getElementById("lightboxLoupeBtn").classList.toggle("active", on);
+    if(!on) hideLoupe();
+  }
+
+  /* ---------------- Export CSV des cartes signalées ---------------- */
+
+  function csvCell(v){
+    const s = String(v == null ? "" : v);
+    return '"' + s.replace(/"/g, '""') + '"';
+  }
+
+  function exportReviewCsv(){
+    const rows = [["Numéro", "Carte", "Set de rencontre", "Numéro de rencontre", "Statut", "Note", "Alertes typographiques", "Fichiers Drive"]];
+    let count = 0;
+    cardGroups.forEach(function(g){
+      const rev = getReview(g.key);
+      const typo = typoIssuesForCard(g.card);
+      // On exporte ce qui demande une action : signalé, annoté, ou repéré par les contrôles.
+      if(!(rev && (rev.status === "flag" || rev.note)) && !typo) return;
+      count++;
+      rows.push([
+        g.number || "",
+        g.card ? g.card.name : (g.front ? g.front.name : ""),
+        g.card ? (g.card.encounter_set_name || "") : "",
+        g.card ? (g.card.encounter_number || "") : "",
+        rev && rev.status === "flag" ? "à corriger" : (rev && rev.status === "ok" ? "relue" : ""),
+        (rev && rev.note) || "",
+        typo ? typo.map(function(t){ return t.label + " : " + t.snippet; }).join(" | ") : "",
+        g.files.map(function(f){ return f.name; }).join(" | ")
+      ]);
+    });
+
+    const statusEl = document.getElementById("reviewStatus");
+    if(count === 0){
+      statusEl.className = "source-status";
+      statusEl.textContent = "Rien à exporter pour l'instant : aucune carte signalée, annotée ou en alerte typographique.";
+      return;
+    }
+    // BOM UTF-8 + point-virgule : Excel en français ouvre le fichier correctement d'un clic.
+    const csv = "﻿" + rows.map(function(r){ return r.map(csvCell).join(";"); }).join("\r\n");
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "relecture-" + (CARD_DATA.project_name || "cartes").replace(/[^\w-]+/g, "_") + ".csv";
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(function(){ URL.revokeObjectURL(url); }, 1000);
+    statusEl.className = "source-status ok";
+    statusEl.textContent = count + " carte(s) exportée(s) (signalées, annotées ou en alerte typographique).";
+  }
+
   function renderImagesGallery(){
     const main = document.getElementById("main");
     if(!driveFiles.length){
@@ -2033,12 +2572,11 @@ const LOCAL_LANGS = [
       return;
     }
 
-    const q = state.filter.trim().toLowerCase();
-    const filtered = driveFiles.filter(function(f){ return imageMatchesFilter(f, q) && imagePassesSetFilter(f); });
+    const groups = visibleGroups();
 
-    if(!filtered.length){
+    if(!groups.length){
       main.innerHTML = projectMismatchBannerHtml() +
-        '<p class="empty-msg">Aucune image ne correspond à la recherche / au filtre.</p>';
+        '<p class="empty-msg">Aucune carte ne correspond à la recherche / aux filtres.</p>';
       return;
     }
 
@@ -2049,22 +2587,28 @@ const LOCAL_LANGS = [
       ? ' · texte issu de « ' + escapeHtml(CARD_DATA.project_name) + ' »'
       : "";
     let html = '<div class="topbar"><div><p class="breadcrumb">Google Drive' + projectHint + '</p>' +
-      '<h2 class="card-title">Images importées</h2></div></div>';
+      '<h2 class="card-title">Cartes à relire</h2></div></div>';
     html += projectMismatchBannerHtml();
     html += '<div class="image-grid">';
-    filtered.forEach(function(f){
-      const badge = f.number
-        ? '<span class="img-num">#' + escapeHtml(f.number) + (f.side === "back" ? " · dos" : "") + '</span>'
+    groups.forEach(function(g){
+      const f = g.front;
+      if(!f) return;
+      const badge = g.number
+        ? '<span class="img-num">#' + escapeHtml(g.number) + (g.back ? " · recto/verso" : "") + '</span>'
         : '<span class="img-num img-num-none">numéro non détecté</span>';
-      const activeCls = f.id === state.activeId ? " active" : "";
+      const rev = getReview(g.key);
+      const revCls = rev && rev.status === "ok" ? " rev-ok" : (rev && rev.status === "flag" ? " rev-flag" : "");
+      const activeCls = g.key === state.activeGroupKey ? " active" : "";
       const rot = getRotation(f.id);
       const rotStyle = rot ? ' style="transform:rotate(' + rot + 'deg)"' : '';
-      html += '<div type="button" class="image-tile' + activeCls + '" id="img-tile-' + escapeHtml(f.id) + '" data-id="' + escapeHtml(f.id) + '" role="button" tabindex="0">' +
+      const typo = typoIssuesForCard(g.card) ? ' <span class="typo-mark" title="Alerte typographique">⚠</span>' : "";
+      html += '<div class="image-tile' + activeCls + revCls + '" id="img-tile-' + escapeHtml(g.key) + '" data-group="' + escapeHtml(g.key) + '" role="button" tabindex="0">' +
         '<div class="image-tile-img-wrap">' +
-        '<img src="' + driveImageUrl(f.id, 400) + '" alt="' + escapeHtml(f.name) + '" loading="lazy"' + rotStyle + '>' +
+        '<img src="' + driveImageUrl(f.id, 400) + '" data-file="' + escapeHtml(f.id) + '" alt="' + escapeHtml(f.name) + '" loading="lazy"' + rotStyle + '>' +
         '<button type="button" class="rotate-btn rotate-btn-tile" data-rotate-id="' + escapeHtml(f.id) + '" title="Pivoter de 90°" aria-label="Pivoter l\'image de 90°">⟳</button>' +
         '</div>' +
-        '<div class="image-tile-meta">' + badge + '<span class="image-tile-name">' + escapeHtml(f.name) + '</span></div>' +
+        '<div class="image-tile-meta">' + badge +
+        '<span class="image-tile-name">' + escapeHtml(g.card ? (g.card.name || f.name) : f.name) + typo + '</span></div>' +
         '</div>';
     });
     html += '</div>';
@@ -2075,22 +2619,48 @@ const LOCAL_LANGS = [
     return (f.number ? "#" + f.number + (f.side === "back" ? " (dos)" : "") + " — " : "") + f.name;
   }
 
-  function openLightbox(id){
-    const f = driveFiles.find(function(x){ return x.id === id; });
+  // Ouvre UNE CARTE (recto + verso) plutôt qu'une image isolée : les flèches ← → passent
+  // à la carte suivante, ↑ ↓ (ou Espace) retournent la carte.
+  function openCard(groupKey, face){
+    const g = groupsByKey[groupKey];
+    if(!g) return;
+    if(!groupHasFace(g, face)) face = groupHasFace(g, "front") ? "front" : "back";
+    state.activeGroupKey = groupKey;
+    state.activeFace = face;
+
+    const f = groupFile(g, face);
     if(!f) return;
-    currentLightboxFileId = id;
+    currentLightboxFileId = f.id;
+
     const img = document.getElementById("lightboxImg");
     const rot = getRotation(f.id);
     // La mise à l'échelle d'une rotation dépend des dimensions réelles de l'image : on la
     // recalcule une fois celle-ci chargée (à l'ouverture, elle ne l'est pas encore).
-    img.onload = function(){ applyLightboxRotation(getRotation(f.id)); };
+    img.onload = function(){ applyLightboxRotation(getRotation(f.id)); updateLoupeSource(); };
     img.src = driveImageUrl(f.id, 1600);
     img.alt = f.name;
     applyLightboxRotation(rot);
     document.getElementById("lightboxCaption").textContent = imageLabel(f);
     document.getElementById("lightboxOpenOriginal").href = "https://drive.google.com/file/d/" + encodeURIComponent(f.id) + "/view";
     document.getElementById("imageLightbox").hidden = false;
+
+    renderFaceSwitcher(g);
     renderLightboxText();
+    renderReviewControls(g);
+  }
+
+  function renderFaceSwitcher(g){
+    document.querySelectorAll("#lightboxFaces button").forEach(function(btn){
+      const face = btn.dataset.face;
+      btn.classList.toggle("active", face === state.activeFace);
+      btn.disabled = !groupHasFace(g, face);
+    });
+  }
+
+  function flipFace(){
+    const g = groupsByKey[state.activeGroupKey];
+    if(!g || !g.front || !g.back) return;
+    openCard(g.key, state.activeFace === "front" ? "back" : "front");
   }
 
   function closeLightbox(){
@@ -2102,6 +2672,7 @@ const LOCAL_LANGS = [
     document.getElementById("lightboxCompareImgWrap").classList.remove("compare-broken");
     document.getElementById("lightboxCompareError").hidden = true;
     currentLightboxFileId = null;
+    hideLoupe();
   }
 
   // Affiche, à côté du scan, l'image finale Shoggoth correspondant à la même carte et à la
@@ -2165,11 +2736,37 @@ const LOCAL_LANGS = [
           + ". Chargez le project.json de la même campagne que ces images : onglet Traductions → Source des données → Fichiers JSON depuis mon ordinateur."
         : "Numéro non détecté dans le nom de fichier.";
       document.getElementById("lightboxTextBody").innerHTML = "";
+      document.getElementById("lightboxNumbers").hidden = true;
+      document.getElementById("lightboxTypoWarnings").hidden = true;
       return;
     }
 
     panel.hidden = false;
     document.getElementById("lightboxCardName").textContent = card.name || f.name;
+
+    // Rappel compact des numéros attendus : ce sont eux qui doivent être imprimés sur
+    // l'image finale, et les vérifier à l'œil demandait sinon d'aller fouiller le JSON.
+    const numbersEl = document.getElementById("lightboxNumbers");
+    const bits = [];
+    if(card.project_number !== "" && card.project_number != null) bits.push("N° " + card.project_number);
+    if(card.encounter_number) bits.push("rencontre " + card.encounter_number);
+    if(card.encounter_set_name) bits.push(card.encounter_set_name);
+    numbersEl.hidden = !bits.length;
+    numbersEl.textContent = bits.join("  ·  ");
+
+    // Alertes typographiques de cette carte.
+    const typoEl = document.getElementById("lightboxTypoWarnings");
+    const issues = typoIssuesForCard(card);
+    if(issues && issues.length){
+      typoEl.hidden = false;
+      typoEl.innerHTML = '<p>⚠ ' + issues.length + ' alerte(s) typographique(s)</p><ul>' +
+        issues.map(function(it){
+          return '<li>' + escapeHtml(it.label) + ' — <code>' + escapeHtml(it.snippet) + '</code></li>';
+        }).join("") + '</ul>';
+    } else {
+      typoEl.hidden = true;
+      typoEl.innerHTML = "";
+    }
 
     let sourceLabel;
     if(LANGS.length > 0){
@@ -2208,87 +2805,98 @@ const LOCAL_LANGS = [
       return;
     }
 
-    const passesBase = function(f){ return imageMatchesFilter(f, q) && imagePassesSetFilter(f); };
+    const shown = visibleGroups();
     const setNames = getEncounterSetNamesForFilter();
 
-    let groups;
+    // Une entrée = une carte. Les groupes de la liste restent les sets de rencontre.
+    let sections;
     if(setNames.length){
-      // Regroupement par set de rencontre (ordre officiel : tableau de référence si chargé,
-      // sinon ordre des cartes du project.json), avec un groupe "Sans correspondance" pour
-      // les fichiers qu'aucune des deux méthodes ne parvient à rattacher à un set.
-      groups = [];
-      setNames.forEach(function(setName){
-        groups.push({
+      sections = setNames.map(function(setName){
+        return {
           key: "img-set-" + setName,
           name: setName,
-          items: driveFiles.filter(function(f){ return passesBase(f) && driveFileEncounterSet(f) === setName; })
-        });
+          items: shown.filter(function(g){ return g.card && g.card.encounter_set_name === setName; })
+        };
       });
-      groups.push({
+      sections.push({
         key: "img-set-none",
         name: "Sans correspondance",
-        items: driveFiles.filter(function(f){ return passesBase(f) && !driveFileEncounterSet(f); })
+        items: shown.filter(function(g){ return !g.card || !g.card.encounter_set_name; })
       });
     } else {
-      groups = [
-        { key: "img-with-number", name: "Numéro détecté", items: driveFiles.filter(function(f){ return f.number && passesBase(f); }) },
-        { key: "img-without-number", name: "Numéro non détecté", items: driveFiles.filter(function(f){ return !f.number && passesBase(f); }) }
+      sections = [
+        { key: "img-with-number", name: "Numéro détecté", items: shown.filter(function(g){ return g.number; }) },
+        { key: "img-without-number", name: "Numéro non détecté", items: shown.filter(function(g){ return !g.number; }) }
       ];
     }
 
     let totalShown = 0;
-    groups.forEach(function(g){
-      if(!g.items.length) return;
-      totalShown += g.items.length;
+    sections.forEach(function(sec){
+      if(!sec.items.length) return;
+      totalShown += sec.items.length;
 
-      const groupEl = document.createElement("div");
-      groupEl.className = "set-group" + (state.collapsed.has(g.key) ? " collapsed" : "");
+      const sectionEl = document.createElement("div");
+      sectionEl.className = "set-group" + (state.collapsed.has(sec.key) ? " collapsed" : "");
 
       const header = document.createElement("button");
       header.className = "set-header";
-      header.innerHTML = '<span class="chev">▾</span><span>' + escapeHtml(g.name) + '</span><span class="count">' + g.items.length + '</span>';
+      const doneInSection = sec.items.filter(function(g){
+        const rev = getReview(g.key); return rev && rev.status === "ok";
+      }).length;
+      header.innerHTML = '<span class="chev">▾</span><span>' + escapeHtml(sec.name) + '</span>' +
+        '<span class="count">' + doneInSection + "/" + sec.items.length + '</span>';
       header.addEventListener("click", function(){
-        if(state.collapsed.has(g.key)) state.collapsed.delete(g.key); else state.collapsed.add(g.key);
+        if(state.collapsed.has(sec.key)) state.collapsed.delete(sec.key); else state.collapsed.add(sec.key);
         buildImagesList();
       });
-      groupEl.appendChild(header);
+      sectionEl.appendChild(header);
 
       const cardsEl = document.createElement("div");
       cardsEl.className = "set-cards";
-      g.items.forEach(function(f){
+      sec.items.forEach(function(g){
+        const rev = getReview(g.key);
+        const dotCls = rev && rev.status === "ok" ? " rev-ok" : (rev && rev.status === "flag" ? " rev-flag" : "");
         const item = document.createElement("button");
-        item.className = "card-item" + (f.id === state.activeId ? " active" : "");
-        item.dataset.id = f.id;
-        item.innerHTML = '<span class="dot"></span><span class="cname">' + escapeHtml(imageLabel(f)) + '</span>';
-        item.addEventListener("click", function(){ selectImageFile(f.id); });
+        item.className = "card-item" + (g.key === state.activeGroupKey ? " active" : "");
+        item.dataset.group = g.key;
+        item.innerHTML = '<span class="dot' + dotCls + '"></span><span class="cname">' +
+          escapeHtml(groupLabel(g)) +
+          (typoIssuesForCard(g.card) ? '<span class="typo-mark" title="Alerte typographique">⚠</span>' : "") +
+          '</span>';
+        item.addEventListener("click", function(){ selectCardGroup(g.key); });
         cardsEl.appendChild(item);
       });
-      groupEl.appendChild(cardsEl);
-      listEl.appendChild(groupEl);
+      sectionEl.appendChild(cardsEl);
+      listEl.appendChild(sectionEl);
     });
 
     if(totalShown === 0){
-      listEl.innerHTML = '<p class="empty-msg">Aucune image ne correspond à la recherche.</p>';
+      listEl.innerHTML = '<p class="empty-msg">Aucune carte ne correspond à la recherche / aux filtres.</p>';
     }
 
-    document.getElementById("statTotal").textContent = driveFiles.length + " image(s)";
-    document.getElementById("statFiltered").textContent = q ? totalShown + " trouvée(s)" : "";
+    document.getElementById("statTotal").textContent =
+      cardGroups.length + " carte(s) · " + driveFiles.length + " image(s)";
+    document.getElementById("statFiltered").textContent =
+      (q || state.imagesSetFilter || state.imagesStatusFilter) ? totalShown + " affichée(s)" : "";
+    renderReviewProgress();
   }
 
-  function selectImageFile(id){
-    state.activeId = id;
+  function selectCardGroup(groupKey, face){
+    state.activeGroupKey = groupKey;
     buildImagesList();
-    const tile = document.getElementById("img-tile-" + id);
+    const tile = document.getElementById("img-tile-" + groupKey);
     if(tile){
       document.querySelectorAll(".image-tile.active").forEach(function(t){ t.classList.remove("active"); });
       tile.classList.add("active");
       tile.scrollIntoView({ behavior: "smooth", block: "center" });
     }
-    openLightbox(id);
+    openCard(groupKey, face || "front");
   }
 
   function refreshImagesView(){
+    buildCardGroups();
     populateImagesSetFilter();
+    populateImagesStatusFilter();
     buildImagesList();
     renderImagesGallery();
   }
@@ -2710,7 +3318,10 @@ const LOCAL_LANGS = [
     document.getElementById("historyFilterRow").hidden = mode !== "history";
     if(mode !== "images"){
       document.getElementById("imagesSetFilter").hidden = true;
+      document.getElementById("imagesStatusFilter").hidden = true;
+      document.getElementById("reviewProgress").hidden = true;
       state.imagesSetFilter = "";
+      state.imagesStatusFilter = "";
     }
     state.filter = "";
     document.getElementById("searchInput").value = "";
@@ -2862,8 +3473,8 @@ const LOCAL_LANGS = [
       rotateImage(rotateBtn.dataset.rotateId);
       return;
     }
-    const tile = e.target.closest(".image-tile[data-id]");
-    if(tile) openLightbox(tile.dataset.id);
+    const tile = e.target.closest(".image-tile[data-group]");
+    if(tile) selectCardGroup(tile.dataset.group);
   });
   document.getElementById("lightboxClose").addEventListener("click", closeLightbox);
   document.getElementById("lightboxRotateBtn").addEventListener("click", function(){
@@ -2874,27 +3485,83 @@ const LOCAL_LANGS = [
   });
   // Liste des fichiers Drive actuellement visibles (recherche + filtre par set appliqués),
   // dans l'ordre d'affichage de la galerie — sert à la navigation clavier ← → dans l'agrandissement.
-  function getVisibleImageIds(){
-    const q = state.filter.trim().toLowerCase();
-    return driveFiles
-      .filter(function(f){ return imageMatchesFilter(f, q) && imagePassesSetFilter(f); })
-      .map(function(f){ return f.id; });
+  // Cartes actuellement visibles (recherche + filtres), dans l'ordre d'affichage : c'est
+  // la liste que parcourent les flèches ← →.
+  function getVisibleGroupKeys(){
+    return visibleGroups().map(function(g){ return g.key; });
+  }
+
+  function stepCard(step){
+    const keys = getVisibleGroupKeys();
+    if(!keys.length) return;
+    const idx = keys.indexOf(state.activeGroupKey);
+    if(idx === -1){ selectCardGroup(keys[0]); return; }
+    if(keys.length < 2) return;
+    selectCardGroup(keys[(idx + step + keys.length) % keys.length]);
   }
 
   document.addEventListener("keydown", function(e){
-    if(e.key === "Escape" && !document.getElementById("imageLightbox").hidden) closeLightbox();
-    if((e.key === "ArrowLeft" || e.key === "ArrowRight") && !document.getElementById("imageLightbox").hidden){
-      const tag = (document.activeElement && document.activeElement.tagName || "").toLowerCase();
-      if(tag === "input" || tag === "select" || tag === "textarea") return;
-      const ids = getVisibleImageIds();
-      if(ids.length < 2) return;
-      const idx = ids.indexOf(currentLightboxFileId);
-      if(idx === -1) return;
+    const lightboxOpen = !document.getElementById("imageLightbox").hidden;
+    if(e.key === "Escape" && lightboxOpen){ closeLightbox(); return; }
+    if(!lightboxOpen) return;
+    // Ne jamais capturer les touches pendant la saisie d'une note ou d'une recherche.
+    const tag = (document.activeElement && document.activeElement.tagName || "").toLowerCase();
+    if(tag === "input" || tag === "select" || tag === "textarea") return;
+
+    if(e.key === "ArrowLeft" || e.key === "ArrowRight"){
       e.preventDefault();
-      const step = e.key === "ArrowRight" ? 1 : -1;
-      const nextIdx = (idx + step + ids.length) % ids.length;
-      selectImageFile(ids[nextIdx]);
+      stepCard(e.key === "ArrowRight" ? 1 : -1);
+    } else if(e.key === "ArrowUp" || e.key === "ArrowDown" || e.key === " " || e.key === "Spacebar"){
+      e.preventDefault();
+      flipFace();
+    } else if(e.key === "v" || e.key === "V"){
+      e.preventDefault();
+      toggleReviewStatus("ok");
+    } else if(e.key === "p" || e.key === "P"){
+      e.preventDefault();
+      toggleReviewStatus("flag");
+    } else if(e.key === "z" || e.key === "Z"){
+      e.preventDefault();
+      setLoupe(!state.loupe);
+    } else if(e.key === "r" || e.key === "R"){
+      e.preventDefault();
+      if(currentLightboxFileId) rotateImage(currentLightboxFileId);
     }
+  });
+
+  /* ---------------- Câblage relecture / loupe / export ---------------- */
+
+  document.getElementById("imagesStatusFilter").addEventListener("change", function(){
+    state.imagesStatusFilter = this.value;
+    buildImagesList();
+    renderImagesGallery();
+  });
+  document.getElementById("lightboxReviewOk").addEventListener("click", function(){ toggleReviewStatus("ok"); });
+  document.getElementById("lightboxReviewFlag").addEventListener("click", function(){ toggleReviewStatus("flag"); });
+  document.getElementById("lightboxLoupeBtn").addEventListener("click", function(){ setLoupe(!state.loupe); });
+  document.getElementById("lightboxFaces").addEventListener("click", function(e){
+    const btn = e.target.closest("button[data-face]");
+    if(btn && !btn.disabled && state.activeGroupKey) openCard(state.activeGroupKey, btn.dataset.face);
+  });
+  document.getElementById("lightboxNote").addEventListener("input", function(){
+    const g = groupsByKey[state.activeGroupKey];
+    if(!g) return;
+    setReviewNote(g.key, this.value);
+    renderReviewProgress();
+  });
+  document.getElementById("imageLightbox").addEventListener("mousemove", moveLoupe);
+  document.getElementById("imageLightbox").addEventListener("mouseleave", hideLoupe);
+  document.getElementById("reviewExportBtn").addEventListener("click", exportReviewCsv);
+  document.getElementById("reviewResetBtn").addEventListener("click", function(){
+    if(!window.confirm("Effacer tous les statuts et notes de relecture de cette campagne ?")) return;
+    reviewData = {};
+    saveReviewData();
+    const statusEl = document.getElementById("reviewStatus");
+    statusEl.className = "source-status";
+    statusEl.textContent = "Relecture réinitialisée pour cette campagne.";
+    if(state.viewMode === "images") refreshImagesView();
+    const g = groupsByKey[state.activeGroupKey];
+    if(g && !document.getElementById("imageLightbox").hidden) renderReviewControls(g);
   });
 
   document.getElementById("sourceLocalBtn").addEventListener("click", function(){
