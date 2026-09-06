@@ -291,12 +291,40 @@
     border-color: var(--accent);
     box-shadow: 0 0 0 2px var(--accent);
   }
+  .image-tile-img-wrap{
+    position: relative;
+  }
   .image-tile img{
     width: 100%;
     aspect-ratio: 5 / 7;
     object-fit: cover;
     display: block;
     background: var(--surface);
+    transition: transform 0.15s ease;
+  }
+  .rotate-btn{
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 15px;
+    line-height: 1;
+    width: 30px;
+    height: 30px;
+    border-radius: 50%;
+    border: 1px solid rgba(255,255,255,0.5);
+    background: rgba(20,18,14,0.6);
+    color: #fff;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .rotate-btn:hover{ background: rgba(20,18,14,0.85); border-color: var(--amber, #e0a94e); }
+  .rotate-btn-tile{
+    position: absolute;
+    top: 6px;
+    right: 6px;
+    width: 26px;
+    height: 26px;
+    font-size: 13px;
   }
   .image-tile-meta{
     padding: 8px 10px 10px;
@@ -357,6 +385,11 @@
     flex: 1 1 auto;
     min-width: 0;
   }
+  .lightbox-img-wrap{
+    position: relative;
+    display: inline-block;
+    max-width: 100%;
+  }
   .lightbox img{
     max-width: min(60vw, 800px);
     max-height: 82vh;
@@ -365,6 +398,13 @@
     border-radius: 10px;
     box-shadow: 0 12px 40px rgba(0,0,0,0.5);
     cursor: default;
+    display: block;
+    transition: transform 0.15s ease;
+  }
+  .lightbox-img-wrap .rotate-btn{
+    position: absolute;
+    top: 10px;
+    right: 10px;
   }
   .lightbox-caption{
     display: flex;
@@ -862,7 +902,12 @@
 
     <div class="source-panel" id="driveImagePanel" hidden>
       <div class="source-body" style="padding-top:12px">
-        <label class="source-label" for="driveFolderInput">Dossier Google Drive (lien de partage)</label>
+        <label class="source-label" for="driveCampaignSelect">Campagne</label>
+        <select class="search-input" id="driveCampaignSelect">
+          <option value="cyclopean">Cyclopean Foundations (dossier officiel)</option>
+          <option value="custom">Personnalisé — mon propre dossier</option>
+        </select>
+        <label class="source-label" for="driveFolderInput" style="margin-top:6px">Dossier Google Drive (lien de partage)</label>
         <input class="search-input" id="driveFolderInput" type="text" autocomplete="off"
                placeholder="https://drive.google.com/drive/folders/…">
         <label class="source-label" for="driveApiKeyInput" style="margin-top:6px">Clé API Google (Drive API)</label>
@@ -871,6 +916,15 @@
           <button type="button" id="driveLoadBtn">Charger les images</button>
         </div>
         <p class="source-status" id="driveStatus">Voir le README pour créer la clé API (gratuit, 2 min).</p>
+
+        <label class="source-label" style="margin-top:14px">Tableau de référence (Google Sheet, optionnel)</label>
+        <input class="search-input" id="refSheetUrl" type="text" autocomplete="off" placeholder="Lien du Google Sheet (…/spreadsheets/d/…/edit)">
+        <p class="source-body-or">— ou —</p>
+        <input class="file-input" id="refSheetFile" type="file" accept=".csv,text/csv">
+        <div class="source-actions" style="margin-top:6px">
+          <button type="button" id="refSheetLoadBtn">Charger le tableau</button>
+        </div>
+        <p class="source-status" id="refSheetStatus">Sert à retrouver la traduction FR de chaque image : la page compare le nom anglais du fichier Drive à ce tableau (colonnes attendues : Encounter Set Name, English Card Name, une colonne « nom FR »), puis cherche la carte FR correspondante dans le JSON. Le Google Sheet doit être partagé en lecture (« Tous les utilisateurs disposant du lien »).</p>
 
         <label class="source-label" style="margin-top:14px">Texte d'origine à comparer (optionnel)</label>
         <input class="search-input" id="origTextUrl" type="text" autocomplete="off" placeholder="Lien GitHub/direct vers un JSON">
@@ -908,7 +962,10 @@
   <button type="button" class="lightbox-close" id="lightboxClose" aria-label="Fermer">×</button>
   <div class="lightbox-body">
     <div class="lightbox-media">
-      <img id="lightboxImg" src="" alt="">
+      <div class="lightbox-img-wrap">
+        <img id="lightboxImg" src="" alt="">
+        <button type="button" class="rotate-btn" id="lightboxRotateBtn" title="Pivoter de 90°" aria-label="Pivoter l'image de 90°">⟳</button>
+      </div>
       <div class="lightbox-caption">
         <span id="lightboxCaption"></span>
         <a id="lightboxOpenOriginal" href="#" target="_blank" rel="noopener">Ouvrir sur Drive ↗</a>
@@ -1482,6 +1539,201 @@ const LOCAL_LANGS = [
   let currentLightboxFileId = null;
   let lightboxShowingOrig = false;
 
+  // Rotation des images (certains scans sont importés de travers) : degrés (0/90/180/270)
+  // par id de fichier Drive, mémorisés dans le navigateur.
+  let driveRotations = {};
+  try{
+    const savedRot = localStorage.getItem("dm_drive_rotations");
+    if(savedRot) driveRotations = JSON.parse(savedRot) || {};
+  } catch(e){ driveRotations = {}; }
+
+  function getRotation(fileId){
+    return driveRotations[fileId] || 0;
+  }
+  function setRotation(fileId, deg){
+    deg = ((deg % 360) + 360) % 360;
+    if(deg === 0) delete driveRotations[fileId];
+    else driveRotations[fileId] = deg;
+    try{ localStorage.setItem("dm_drive_rotations", JSON.stringify(driveRotations)); } catch(e){}
+  }
+  function rotateImage(fileId){
+    const next = (getRotation(fileId) + 90) % 360;
+    setRotation(fileId, next);
+    // Met à jour l'aperçu ouvert (lightbox) sans tout re-rendre.
+    if(currentLightboxFileId === fileId){
+      document.getElementById("lightboxImg").style.transform = next ? "rotate(" + next + "deg)" : "";
+    }
+    // Met à jour la vignette correspondante dans la galerie si elle est affichée.
+    const tileImg = document.querySelector('#img-tile-' + CSS.escape(fileId) + ' img');
+    if(tileImg) tileImg.style.transform = next ? "rotate(" + next + "deg)" : "";
+  }
+
+  // Campagnes prédéfinies : sélection rapide d'un dossier Drive "officiel" sans avoir à
+  // copier/coller le lien à chaque fois. "custom" laisse l'utilisateur entrer son propre lien.
+  const CAMPAIGN_PRESETS = {
+    cyclopean: {
+      label: "Cyclopean Foundations",
+      folder: "https://drive.google.com/drive/folders/1i-zHJBqPsNXwtHgQoSjRdc1yu_3qSKJO"
+    }
+  };
+  function applyCampaignPreset(){
+    const sel = document.getElementById("driveCampaignSelect").value;
+    const folderInput = document.getElementById("driveFolderInput");
+    if(sel !== "custom" && CAMPAIGN_PRESETS[sel]){
+      folderInput.value = CAMPAIGN_PRESETS[sel].folder;
+      folderInput.readOnly = true;
+    } else {
+      folderInput.readOnly = false;
+      let savedCustom = "";
+      try{ savedCustom = localStorage.getItem("dm_drive_folder_custom") || ""; } catch(e){}
+      folderInput.value = savedCustom;
+    }
+  }
+
+  // Tableau de référence (Google Sheet) : sert à retrouver la carte FR correspondant à une
+  // image Drive en comparant le nom anglais du fichier au nom anglais listé dans le tableau,
+  // puis en cherchant la carte du JSON dont le nom FR correspond au nom FR de cette ligne.
+  let REF_ROWS = []; // [{ esName, nameEn, nameFr }]
+  let REF_BY_EN = {}; // nom anglais normalisé -> [ligne, ...] (plusieurs si le nom se répète, ex. "Auction Lot")
+
+  function normName(s){
+    if(!s) return "";
+    return String(s)
+      .normalize("NFKD").replace(/[̀-ͯ]/g, "")
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, " ")
+      .trim();
+  }
+
+  function driveFileBaseName(name){
+    let s = (name || "").replace(/\.[a-zA-Z0-9]+$/, "");           // enlève l'extension
+    s = s.replace(/^0*\d+\s*[-_.]?\s*/, "");                        // enlève le numéro de tête
+    s = s.replace(/[\s\-_]+(\d+|b|back|verso)$/i, "");              // enlève le suffixe de copie/dos
+    return s.trim();
+  }
+
+  function csvParse(text){
+    // Parseur CSV minimal (virgule + guillemets doublés) — suffisant pour un export Google Sheets.
+    const rows = [];
+    let row = [], field = "", inQuotes = false;
+    for(let i = 0; i < text.length; i++){
+      const c = text[i];
+      if(inQuotes){
+        if(c === '"'){
+          if(text[i+1] === '"'){ field += '"'; i++; }
+          else inQuotes = false;
+        } else field += c;
+      } else {
+        if(c === '"') inQuotes = true;
+        else if(c === ','){ row.push(field); field = ""; }
+        else if(c === '\n'){ row.push(field); rows.push(row); row = []; field = ""; }
+        else if(c === '\r'){ /* ignoré, \n suit */ }
+        else field += c;
+      }
+    }
+    if(field.length || row.length){ row.push(field); rows.push(row); }
+    return rows.filter(function(r){ return r.length > 1 || (r.length === 1 && r[0] !== ""); });
+  }
+
+  function findColumnIndex(header, patterns){
+    for(let i = 0; i < header.length; i++){
+      const h = normName(header[i]);
+      for(const p of patterns){ if(h.includes(p)) return i; }
+    }
+    return -1;
+  }
+
+  function parseGoogleSheetUrl(url){
+    const s = (url || "").trim();
+    const m = s.match(/\/spreadsheets\/d\/([a-zA-Z0-9-_]+)/);
+    if(!m) return null;
+    let gid = "0";
+    const gidMatch = s.match(/[#&?]gid=([0-9]+)/);
+    if(gidMatch) gid = gidMatch[1];
+    return { id: m[1], gid: gid };
+  }
+
+  function setReferenceRows(rows){
+    REF_ROWS = rows;
+    REF_BY_EN = {};
+    REF_ROWS.forEach(function(row){
+      const key = normName(row.nameEn);
+      if(!key) return;
+      if(!REF_BY_EN[key]) REF_BY_EN[key] = [];
+      REF_BY_EN[key].push(row);
+    });
+  }
+
+  function parseReferenceCsvText(text){
+    const rows = csvParse(text);
+    if(rows.length < 2) throw new Error("Le tableau semble vide.");
+    const header = rows[0];
+    const idxEs = findColumnIndex(header, ["encounter set"]);
+    const idxEn = findColumnIndex(header, ["english card name", "nom en", "name en", "english name"]);
+    const idxFr = findColumnIndex(header, ["nom fr", "name fr", "french", "francais"]);
+    if(idxEn === -1 || idxFr === -1){
+      throw new Error("Colonnes attendues introuvables (il faut une colonne nom anglais et une colonne nom FR dans la 1ère ligne).");
+    }
+    const out = [];
+    for(let i = 1; i < rows.length; i++){
+      const r = rows[i];
+      const nameEn = (r[idxEn] || "").trim();
+      const nameFr = (r[idxFr] || "").trim();
+      if(!nameEn || !nameFr) continue;
+      out.push({ esName: idxEs >= 0 ? (r[idxEs] || "").trim() : "", nameEn: nameEn, nameFr: nameFr });
+    }
+    setReferenceRows(out);
+    return { total: out.length };
+  }
+
+  async function loadReferenceSheetFromUrl(url){
+    const parsed = parseGoogleSheetUrl(url);
+    if(!parsed) throw new Error("Lien Google Sheet non reconnu (attendu : …/spreadsheets/d/<id>/edit…).");
+    const csvUrl = "https://docs.google.com/spreadsheets/d/" + parsed.id + "/export?format=csv&gid=" + parsed.gid;
+    const r = await fetch(csvUrl);
+    if(!r.ok) throw new Error("HTTP " + r.status + " — le Google Sheet doit être partagé en lecture (« Tous les utilisateurs disposant du lien »).");
+    const text = await r.text();
+    return parseReferenceCsvText(text);
+  }
+
+  function readFileAsText(file){
+    return new Promise(function(resolve, reject){
+      const reader = new FileReader();
+      reader.onload = function(){ resolve(reader.result); };
+      reader.onerror = function(){ reject(new Error("Lecture du fichier impossible.")); };
+      reader.readAsText(file, "utf-8");
+    });
+  }
+
+  function findCardByFrName(nameFr){
+    if(!nameFr || !CARD_DATA.cards.length) return null;
+    const target = normName(nameFr);
+    if(!target) return null;
+    return CARD_DATA.cards.find(function(c){ return normName(c.name) === target; }) || null;
+  }
+
+  // Retrouve la carte JSON correspondant à un fichier Drive via le tableau de référence :
+  // nom du fichier (anglais) -> ligne du tableau -> nom FR -> carte du JSON portant ce nom.
+  // Les doublons de nom (ex. plusieurs "Auction Lot") sont départagés par rang de numéro Drive.
+  function resolveCardViaReferenceSheet(f){
+    if(!REF_ROWS.length) return null;
+    const baseName = normName(driveFileBaseName(f.name));
+    if(!baseName) return null;
+    const group = REF_BY_EN[baseName];
+    if(!group || !group.length) return null;
+    let refRow = group[0];
+    if(group.length > 1){
+      const sameNameFiles = driveFiles
+        .filter(function(x){ return normName(driveFileBaseName(x.name)) === baseName; })
+        .slice()
+        .sort(function(a, b){ return (parseInt(a.number, 10) || 0) - (parseInt(b.number, 10) || 0); });
+      const rank = sameNameFiles.findIndex(function(x){ return x.id === f.id; });
+      refRow = group[rank] !== undefined ? group[rank] : group[0];
+    }
+    const card = findCardByFrName(refRow.nameFr);
+    return card ? { card: card, refRow: refRow } : null;
+  }
+
   function buildLookupByProjectNumber(container){
     const byNum = {};
     const arr = Array.isArray(container) ? container : Object.values(container || {});
@@ -1597,10 +1849,15 @@ const LOCAL_LANGS = [
         ? '<span class="img-num">#' + escapeHtml(f.number) + (f.side === "back" ? " · dos" : "") + '</span>'
         : '<span class="img-num img-num-none">numéro non détecté</span>';
       const activeCls = f.id === state.activeId ? " active" : "";
-      html += '<button type="button" class="image-tile' + activeCls + '" id="img-tile-' + escapeHtml(f.id) + '" data-id="' + escapeHtml(f.id) + '">' +
-        '<img src="' + driveImageUrl(f.id, 400) + '" alt="' + escapeHtml(f.name) + '" loading="lazy">' +
+      const rot = getRotation(f.id);
+      const rotStyle = rot ? ' style="transform:rotate(' + rot + 'deg)"' : '';
+      html += '<div type="button" class="image-tile' + activeCls + '" id="img-tile-' + escapeHtml(f.id) + '" data-id="' + escapeHtml(f.id) + '" role="button" tabindex="0">' +
+        '<div class="image-tile-img-wrap">' +
+        '<img src="' + driveImageUrl(f.id, 400) + '" alt="' + escapeHtml(f.name) + '" loading="lazy"' + rotStyle + '>' +
+        '<button type="button" class="rotate-btn rotate-btn-tile" data-rotate-id="' + escapeHtml(f.id) + '" title="Pivoter de 90°" aria-label="Pivoter l\'image de 90°">⟳</button>' +
+        '</div>' +
         '<div class="image-tile-meta">' + badge + '<span class="image-tile-name">' + escapeHtml(f.name) + '</span></div>' +
-        '</button>';
+        '</div>';
     });
     html += '</div>';
     main.innerHTML = html;
@@ -1615,8 +1872,11 @@ const LOCAL_LANGS = [
     if(!f) return;
     currentLightboxFileId = id;
     lightboxShowingOrig = false;
-    document.getElementById("lightboxImg").src = driveImageUrl(f.id, 1600);
-    document.getElementById("lightboxImg").alt = f.name;
+    const img = document.getElementById("lightboxImg");
+    img.src = driveImageUrl(f.id, 1600);
+    img.alt = f.name;
+    const rot = getRotation(f.id);
+    img.style.transform = rot ? "rotate(" + rot + "deg)" : "";
     document.getElementById("lightboxCaption").textContent = imageLabel(f);
     document.getElementById("lightboxOpenOriginal").href = "https://drive.google.com/file/d/" + encodeURIComponent(f.id) + "/view";
     document.getElementById("imageLightbox").hidden = false;
@@ -1631,35 +1891,47 @@ const LOCAL_LANGS = [
     lightboxShowingOrig = false;
   }
 
-  // Cherche la carte correspondant à l'image ouverte (par numéro détecté dans le nom
-  // de fichier Drive == project_number de la carte) et affiche son texte à côté de
+  // Cherche la carte correspondant à l'image ouverte et affiche son texte à côté de
   // l'image — avec un bouton pour basculer vers un second JSON "texte d'origine" si
   // l'utilisateur en a chargé un.
+  // Deux méthodes de correspondance, dans cet ordre de priorité :
+  //  1) via le tableau de référence (Google Sheet), si chargé : nom du fichier Drive
+  //     (anglais) -> ligne du tableau -> nom FR -> carte du JSON portant ce nom FR ;
+  //  2) à défaut, l'ancienne méthode par numéro : numéro détecté dans le nom de fichier
+  //     Drive == project_number de la carte.
   function renderLightboxText(){
     const panel = document.getElementById("lightboxTextPanel");
     const flipBtn = document.getElementById("lightboxFlipBtn");
     if(!currentLightboxFileId){ panel.hidden = true; return; }
 
     const f = driveFiles.find(function(x){ return x.id === currentLightboxFileId; });
-    if(!f || !f.number){
-      panel.hidden = true;
-      return;
+    if(!f){ panel.hidden = true; return; }
+
+    let card = null;
+    let viaReference = false;
+    const refMatch = resolveCardViaReferenceSheet(f);
+    if(refMatch){
+      card = refMatch.card;
+      viaReference = true;
+    } else if(f.number){
+      card = CARD_DATA.cards.find(function(c){ return String(c.project_number) === f.number; }) || null;
     }
-
-    const card = CARD_DATA.cards.find(function(c){ return String(c.project_number) === f.number; });
-    const origCard = ORIG_TEXT_BY_NUMBER[f.number];
-
-    panel.hidden = false;
+    const origCard = f.number ? ORIG_TEXT_BY_NUMBER[f.number] : null;
 
     if(!card && !origCard){
+      panel.hidden = false;
       document.getElementById("lightboxCardName").textContent = "Carte introuvable";
-      document.getElementById("lightboxTextSource").textContent =
-        "Numéro #" + f.number + " — aucune carte avec ce project_number dans les données chargées (onglet Traductions et/ou texte d'origine).";
+      document.getElementById("lightboxTextSource").textContent = REF_ROWS.length
+        ? "Aucune correspondance dans le tableau de référence, ni par numéro (" + (f.number ? "#" + f.number : "numéro non détecté") + ")."
+        : (f.number
+            ? "Numéro #" + f.number + " — aucune carte avec ce project_number dans les données chargées (onglet Traductions et/ou texte d'origine)."
+            : "Numéro non détecté dans le nom de fichier, et aucun tableau de référence chargé pour matcher par nom.");
       document.getElementById("lightboxTextBody").innerHTML = "";
       flipBtn.hidden = true;
       return;
     }
 
+    panel.hidden = false;
     flipBtn.hidden = !(card && origCard); // le flip n'a de sens que si les deux existent
     flipBtn.classList.toggle("active", lightboxShowingOrig);
     flipBtn.textContent = lightboxShowingOrig ? "⇄ Texte actuel" : "⇄ Texte d'origine";
@@ -1674,11 +1946,14 @@ const LOCAL_LANGS = [
       sourceLabel = "Texte d'origine (2e JSON chargé)";
     } else if(!card){
       sourceLabel = "Aucune carte « actuelle » — seul le texte d'origine est disponible";
-    } else if(LANGS.length > 0){
-      const L = LANG_BY_CODE[state.lang] || LANGS[0];
-      sourceLabel = "Texte actuel — " + (L ? L.label : "original");
     } else {
-      sourceLabel = "Texte actuel (original, aucune traduction chargée)";
+      const via = viaReference ? " (via tableau de référence)" : "";
+      if(LANGS.length > 0){
+        const L = LANG_BY_CODE[state.lang] || LANGS[0];
+        sourceLabel = "Texte actuel — " + (L ? L.label : "original") + via;
+      } else {
+        sourceLabel = "Texte actuel (original, aucune traduction chargée)" + via;
+      }
     }
     document.getElementById("lightboxTextSource").textContent = sourceLabel;
 
@@ -2255,6 +2530,9 @@ const LOCAL_LANGS = [
       const res = await loadDriveImages(folderVal, apiKey);
       statusEl.className = "source-status ok";
       statusEl.textContent = res.total + " image(s) trouvée(s), " + res.withNumber + " avec un numéro détecté.";
+      if(document.getElementById("driveCampaignSelect").value === "custom"){
+        try{ localStorage.setItem("dm_drive_folder_custom", folderVal); } catch(e){}
+      }
       if(state.viewMode === "images") refreshImagesView();
     } catch(err){
       console.error("[drive]", err);
@@ -2267,6 +2545,42 @@ const LOCAL_LANGS = [
     document.getElementById(id).addEventListener("keydown", function(e){
       if(e.key === "Enter") runDriveLoad();
     });
+  });
+  document.getElementById("driveCampaignSelect").addEventListener("change", function(){
+    try{ localStorage.setItem("dm_drive_campaign", this.value); } catch(e){}
+    applyCampaignPreset();
+  });
+
+  // Tableau de référence (Google Sheet) : lien public, ou fichier CSV téléchargé en local.
+  async function runRefSheetLoad(){
+    const statusEl = document.getElementById("refSheetStatus");
+    const fileInput = document.getElementById("refSheetFile");
+    const url = document.getElementById("refSheetUrl").value.trim();
+    statusEl.className = "source-status";
+    statusEl.textContent = "Chargement du tableau de référence…";
+    try{
+      let res;
+      if(fileInput.files && fileInput.files[0]){
+        const text = await readFileAsText(fileInput.files[0]);
+        res = parseReferenceCsvText(text);
+      } else if(url){
+        res = await loadReferenceSheetFromUrl(url);
+        try{ localStorage.setItem("dm_ref_sheet_url", url); } catch(e){}
+      } else {
+        throw new Error("Colle le lien du Google Sheet, ou choisis un fichier CSV téléchargé.");
+      }
+      statusEl.className = "source-status ok";
+      statusEl.textContent = res.total + " ligne(s) chargée(s) — la traduction FR est cherchée automatiquement via ce tableau à l'ouverture d'une image.";
+      if(!document.getElementById("imageLightbox").hidden) renderLightboxText();
+    } catch(err){
+      console.error("[refsheet]", err);
+      statusEl.className = "source-status err";
+      statusEl.textContent = "Échec : " + err.message;
+    }
+  }
+  document.getElementById("refSheetLoadBtn").addEventListener("click", runRefSheetLoad);
+  document.getElementById("refSheetUrl").addEventListener("keydown", function(e){
+    if(e.key === "Enter") runRefSheetLoad();
   });
 
   // Second JSON optionnel : texte "d'origine" à comparer avec le texte actuel,
@@ -2308,11 +2622,21 @@ const LOCAL_LANGS = [
   });
 
   // Clic sur une vignette de la galerie → agrandissement (lightbox), sans quitter la page.
+  // Le bouton de rotation sur la vignette a priorité et ne doit pas ouvrir l'agrandissement.
   document.getElementById("main").addEventListener("click", function(e){
+    const rotateBtn = e.target.closest(".rotate-btn-tile[data-rotate-id]");
+    if(rotateBtn){
+      e.stopPropagation();
+      rotateImage(rotateBtn.dataset.rotateId);
+      return;
+    }
     const tile = e.target.closest(".image-tile[data-id]");
     if(tile) openLightbox(tile.dataset.id);
   });
   document.getElementById("lightboxClose").addEventListener("click", closeLightbox);
+  document.getElementById("lightboxRotateBtn").addEventListener("click", function(){
+    if(currentLightboxFileId) rotateImage(currentLightboxFileId);
+  });
   document.getElementById("imageLightbox").addEventListener("click", function(e){
     if(e.target.id === "imageLightbox" || e.target.classList.contains("lightbox-body")) closeLightbox();
   });
@@ -2349,15 +2673,23 @@ const LOCAL_LANGS = [
       loadFromLocal();
     }
 
-    let savedDriveFolder = null, savedDriveKey = null;
-    try{
-      savedDriveFolder = localStorage.getItem("dm_drive_folder");
-      savedDriveKey = localStorage.getItem("dm_drive_key");
-    } catch(e){}
-    if(savedDriveFolder && savedDriveKey){
-      document.getElementById("driveFolderInput").value = savedDriveFolder;
+    let savedCampaign = "cyclopean";
+    try{ savedCampaign = localStorage.getItem("dm_drive_campaign") || "cyclopean"; } catch(e){}
+    document.getElementById("driveCampaignSelect").value = savedCampaign;
+    applyCampaignPreset();
+
+    let savedDriveKey = null;
+    try{ savedDriveKey = localStorage.getItem("dm_drive_key"); } catch(e){}
+    if(savedDriveKey){
       document.getElementById("driveApiKeyInput").value = savedDriveKey;
-      runDriveLoad();
+      if(document.getElementById("driveFolderInput").value.trim()) runDriveLoad();
+    }
+
+    let savedRefSheetUrl = null;
+    try{ savedRefSheetUrl = localStorage.getItem("dm_ref_sheet_url"); } catch(e){}
+    if(savedRefSheetUrl){
+      document.getElementById("refSheetUrl").value = savedRefSheetUrl;
+      runRefSheetLoad();
     }
 
     let savedOrigTextUrl = null;
