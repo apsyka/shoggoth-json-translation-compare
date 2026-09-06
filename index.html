@@ -903,6 +903,14 @@
           <button type="button" id="driveLoadBtn">Charger les images</button>
         </div>
         <p class="source-status" id="driveStatus">Voir le README pour créer la clé API (gratuit, 2 min). Le texte affiché pour chaque image vient uniquement du project.json chargé dans l'onglet « Traductions » (correspondance par numéro).</p>
+
+        <label class="source-label" for="shoggothFolderInput" style="margin-top:14px">Dossier Google Drive — images finales Shoggoth (optionnel)</label>
+        <input class="search-input" id="shoggothFolderInput" type="text" autocomplete="off"
+               placeholder="https://drive.google.com/drive/folders/…">
+        <div class="source-actions" style="margin-top:6px">
+          <button type="button" id="shoggothLoadBtn">Charger les images finales</button>
+        </div>
+        <p class="source-status" id="shoggothStatus">Optionnel : un dossier Drive avec les images finales exportées depuis Shoggoth, pour les comparer directement au scan à côté (nom de fichier attendu : identifiant de la carte en tête, ex. « 0c287f33-e134-4759-9bc2-7fab82e87a1b_nom_front_1.png »). Réutilise la même clé API que ci-dessus.</p>
       </div>
     </div>
 
@@ -941,6 +949,15 @@
       <div class="lightbox-caption">
         <span id="lightboxCaption"></span>
         <a id="lightboxOpenOriginal" href="#" target="_blank" rel="noopener">Ouvrir sur Drive ↗</a>
+      </div>
+    </div>
+    <div class="lightbox-media" id="lightboxCompareMedia" hidden>
+      <div class="lightbox-img-wrap">
+        <img id="lightboxCompareImg" src="" alt="">
+      </div>
+      <div class="lightbox-caption">
+        <span>Version finale (Shoggoth)</span>
+        <a id="lightboxCompareOpenOriginal" href="#" target="_blank" rel="noopener">Ouvrir sur Drive ↗</a>
       </div>
     </div>
     <div class="lightbox-text" id="lightboxTextPanel" hidden>
@@ -1507,6 +1524,7 @@ const LOCAL_LANGS = [
      import + un classement. */
 
   let driveFiles = []; // [{ id, name, number, side }] trié par numéro puis nom
+  let shoggothFiles = []; // [{ id, name, cardId, side }] images finales exportées depuis Shoggoth
   let currentLightboxFileId = null;
 
   // Rotation des images (certains scans sont importés de travers) : degrés (0/90/180/270)
@@ -1561,6 +1579,7 @@ const LOCAL_LANGS = [
   // pouvoir le remettre tel quel quand on change de campagne (au lieu de laisser un vieux
   // message affiché pour la campagne précédente).
   const DEFAULT_DRIVE_STATUS = document.getElementById("driveStatus").textContent;
+  const DEFAULT_SHOGGOTH_STATUS = document.getElementById("shoggothStatus").textContent;
 
   function applyCampaignPreset(){
     const sel = document.getElementById("driveCampaignSelect").value;
@@ -1583,21 +1602,31 @@ const LOCAL_LANGS = [
   // Foundations").
   function loadCampaignScopedState(autoLoad){
     driveFiles = [];
+    shoggothFiles = [];
     currentLightboxFileId = null;
     state.imagesSetFilter = "";
 
     document.getElementById("driveStatus").className = "source-status";
     document.getElementById("driveStatus").textContent = DEFAULT_DRIVE_STATUS;
+    document.getElementById("shoggothStatus").className = "source-status";
+    document.getElementById("shoggothStatus").textContent = DEFAULT_SHOGGOTH_STATUS;
 
     let savedKey = "";
     try{ savedKey = localStorage.getItem(campaignScopedKey("dm_drive_key")) || ""; } catch(e){}
     document.getElementById("driveApiKeyInput").value = savedKey;
+
+    let savedShoggothFolder = "";
+    try{ savedShoggothFolder = localStorage.getItem(campaignScopedKey("dm_shoggoth_folder")) || ""; } catch(e){}
+    document.getElementById("shoggothFolderInput").value = savedShoggothFolder;
 
     if(state.viewMode === "images") refreshImagesView();
     if(!document.getElementById("imageLightbox").hidden) renderLightboxText();
 
     if(autoLoad && savedKey && document.getElementById("driveFolderInput").value.trim()){
       runDriveLoad();
+    }
+    if(autoLoad && savedKey && savedShoggothFolder){
+      runShoggothLoad();
     }
   }
 
@@ -1714,6 +1743,50 @@ const LOCAL_LANGS = [
     return { total: files.length, withNumber: files.filter(function(f){ return f.number; }).length };
   }
 
+  // Images finales exportées depuis Shoggoth : le nom de fichier commence par l'identifiant
+  // (UUID) de la carte, suivi d'un nom lisible et de "front"/"back" — ex.
+  // "0c287f33-e134-4759-9bc2-7fab82e87a1b_nom_front_1.png". On extrait cet id directement (pas
+  // de numéro à deviner), ce qui permet un matching fiable avec le "id" des cartes du
+  // project.json, indépendamment de tout project_number.
+  const UUID_RE = /^([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})/i;
+  function classifyShoggothFilename(name){
+    const m = (name || "").match(UUID_RE);
+    if(!m) return null;
+    const rest = name.slice(m[0].length);
+    let side = null;
+    if(/front/i.test(rest)) side = "front";
+    else if(/back/i.test(rest)) side = "back";
+    return { cardId: m[1], side: side };
+  }
+
+  async function loadShoggothImages(folderInputVal, apiKey){
+    const folderId = parseGoogleDriveFolderId(folderInputVal);
+    if(!folderId) throw new Error("Lien de dossier Google Drive invalide.");
+    if(!apiKey) throw new Error("Clé API Google manquante (voir le README).");
+    const rawFiles = await fetchAllDriveFiles(folderId, apiKey);
+    const files = rawFiles.map(function(f){
+      const c = classifyShoggothFilename(f.name);
+      return { id: f.id, name: f.name, cardId: c ? c.cardId : null, side: c ? c.side : null };
+    }).filter(function(f){ return f.cardId; }); // un fichier sans id reconnaissable ne sert à rien ici
+    shoggothFiles = files;
+    try{ localStorage.setItem(campaignScopedKey("dm_shoggoth_folder"), folderInputVal); } catch(e){}
+    return { total: files.length };
+  }
+
+  // Retrouve l'image finale Shoggoth d'une carte pour une face donnée. Si la face du scan
+  // n'a pas pu être déterminée (pas de suffixe -1/-2/back), on prend la première image
+  // disponible pour cette carte plutôt que de ne rien montrer.
+  function findShoggothFileForCard(cardId, side){
+    if(!cardId || !shoggothFiles.length) return null;
+    const matches = shoggothFiles.filter(function(f){ return f.cardId === cardId; });
+    if(!matches.length) return null;
+    if(side){
+      const exact = matches.find(function(f){ return f.side === side; });
+      if(exact) return exact;
+    }
+    return matches[0];
+  }
+
   function imageMatchesFilter(f, q){
     if(!q) return true;
     return f.name.toLowerCase().includes(q) || (f.number && f.number.includes(q));
@@ -1804,7 +1877,28 @@ const LOCAL_LANGS = [
     const box = document.getElementById("imageLightbox");
     box.hidden = true;
     document.getElementById("lightboxImg").src = "";
+    document.getElementById("lightboxCompareImg").src = "";
+    document.getElementById("lightboxCompareMedia").hidden = true;
     currentLightboxFileId = null;
+  }
+
+  // Affiche, à côté du scan, l'image finale Shoggoth correspondant à la même carte et à la
+  // même face (si un dossier d'images finales est chargé et qu'une correspondance existe) —
+  // pour comparer les deux directement, sans avoir à ouvrir Drive dans un autre onglet.
+  function renderLightboxCompare(f, card){
+    const media = document.getElementById("lightboxCompareMedia");
+    const shoggothFile = card ? findShoggothFileForCard(card.id, f.side) : null;
+    if(!shoggothFile){
+      media.hidden = true;
+      document.getElementById("lightboxCompareImg").src = "";
+      return;
+    }
+    media.hidden = false;
+    const img = document.getElementById("lightboxCompareImg");
+    img.src = driveImageUrl(shoggothFile.id, 1600);
+    img.alt = shoggothFile.name;
+    document.getElementById("lightboxCompareOpenOriginal").href =
+      "https://drive.google.com/file/d/" + encodeURIComponent(shoggothFile.id) + "/view";
   }
 
   // Cherche la carte correspondant à l'image ouverte et affiche son texte à côté de l'image.
@@ -1820,6 +1914,7 @@ const LOCAL_LANGS = [
     if(!f){ panel.hidden = true; return; }
 
     const card = findCardByDriveNumber(f);
+    renderLightboxCompare(f, card);
 
     if(!card){
       panel.hidden = false;
@@ -2474,6 +2569,29 @@ const LOCAL_LANGS = [
   document.getElementById("driveSourceToggle").addEventListener("click", function(){
     const body = document.getElementById("driveSourceBody");
     body.hidden = !body.hidden;
+  });
+
+  async function runShoggothLoad(){
+    const folderVal = document.getElementById("shoggothFolderInput").value;
+    const apiKey = document.getElementById("driveApiKeyInput").value.trim();
+    const statusEl = document.getElementById("shoggothStatus");
+    statusEl.className = "source-status";
+    statusEl.textContent = "Chargement des images finales…";
+    try{
+      const res = await loadShoggothImages(folderVal, apiKey);
+      statusEl.className = "source-status ok";
+      statusEl.textContent = res.total + " image(s) finale(s) trouvée(s) et reconnue(s) par leur identifiant de carte.";
+      if(!document.getElementById("imageLightbox").hidden) renderLightboxText();
+      if(state.viewMode === "images") refreshImagesView();
+    } catch(err){
+      console.error("[shoggoth]", err);
+      statusEl.className = "source-status err";
+      statusEl.textContent = "Échec : " + err.message;
+    }
+  }
+  document.getElementById("shoggothLoadBtn").addEventListener("click", runShoggothLoad);
+  document.getElementById("shoggothFolderInput").addEventListener("keydown", function(e){
+    if(e.key === "Enter") runShoggothLoad();
   });
 
   // Clic sur une vignette de la galerie → agrandissement (lightbox), sans quitter la page.
