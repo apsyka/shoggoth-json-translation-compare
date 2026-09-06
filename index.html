@@ -942,6 +942,9 @@
       <label class="filter-row" id="historyFilterRow" hidden>
         <input type="checkbox" id="onlyChangedCheckbox"> Cartes modifiées uniquement
       </label>
+      <select class="search-input" id="imagesSetFilter" hidden style="margin-top:8px">
+        <option value="">Tous les sets de rencontre</option>
+      </select>
     </div>
     <div class="stats-line">
       <span id="statTotal">— cartes</span>
@@ -1036,7 +1039,8 @@ const LOCAL_LANGS = [
     collapsed: new Set(),
     sourceMode: "local", // "local" | "github"
     sourceUrl: "",
-    viewMode: "translations" // "translations" | "history"
+    viewMode: "translations", // "translations" | "history"
+    imagesSetFilter: "" // filtre par set de rencontre, onglet Images VO
   };
 
   let CARD_DATA = { project_name: "", cards: [] };
@@ -1712,10 +1716,10 @@ const LOCAL_LANGS = [
     return CARD_DATA.cards.find(function(c){ return normName(c.name) === target; }) || null;
   }
 
-  // Retrouve la carte JSON correspondant à un fichier Drive via le tableau de référence :
-  // nom du fichier (anglais) -> ligne du tableau -> nom FR -> carte du JSON portant ce nom.
-  // Les doublons de nom (ex. plusieurs "Auction Lot") sont départagés par rang de numéro Drive.
-  function resolveCardViaReferenceSheet(f){
+  // Retrouve la ligne du tableau de référence correspondant à un fichier Drive, via son nom
+  // (anglais). Les doublons de nom (ex. plusieurs "Auction Lot") sont départagés par rang de
+  // numéro Drive parmi les fichiers portant le même nom de base.
+  function findReferenceRowForFile(f){
     if(!REF_ROWS.length) return null;
     const baseName = normName(driveFileBaseName(f.name));
     if(!baseName) return null;
@@ -1730,8 +1734,37 @@ const LOCAL_LANGS = [
       const rank = sameNameFiles.findIndex(function(x){ return x.id === f.id; });
       refRow = group[rank] !== undefined ? group[rank] : group[0];
     }
+    return refRow;
+  }
+
+  // Retrouve la carte JSON correspondant à un fichier Drive via le tableau de référence :
+  // nom du fichier (anglais) -> ligne du tableau -> nom FR -> carte du JSON portant ce nom.
+  function resolveCardViaReferenceSheet(f){
+    const refRow = findReferenceRowForFile(f);
+    if(!refRow) return null;
     const card = findCardByFrName(refRow.nameFr);
     return card ? { card: card, refRow: refRow } : null;
+  }
+
+  // Nom du set de rencontre (tel qu'écrit dans le tableau de référence) pour un fichier Drive,
+  // ou null si aucune correspondance.
+  function driveFileEncounterSet(f){
+    const refRow = findReferenceRowForFile(f);
+    return (refRow && refRow.esName) ? refRow.esName : null;
+  }
+
+  // Liste des noms de sets de rencontre présents dans le tableau de référence, dans l'ordre
+  // d'apparition (= ordre officiel du scénario).
+  function getReferenceEncounterSetNames(){
+    const seen = new Set();
+    const names = [];
+    REF_ROWS.forEach(function(row){
+      const name = row.esName || "";
+      if(!name || seen.has(name)) return;
+      seen.add(name);
+      names.push(name);
+    });
+    return names;
   }
 
   function buildLookupByProjectNumber(container){
@@ -1767,6 +1800,16 @@ const LOCAL_LANGS = [
     const m = (name || "").match(/^0*(\d+)/);
     if(!m) return null;
     const rest = name.slice(m[0].length);
+    // Convention Cyclopean Foundations (et similaires) : le nom se termine par
+    // "-1" (face avant / texte) ou "-2" (face arrière / dos), juste avant l'extension.
+    // Priorité à cette convention car un simple "back|verso|b" est trop permissif
+    // (ex : un nom de carte contenant "b" tout court).
+    const suffixMatch = (name || "").match(/-(\d+)\s*\.[a-zA-Z0-9]+$/);
+    if(suffixMatch){
+      const n = suffixMatch[1];
+      if(n === "1") return { number: m[1], side: "front" };
+      if(n === "2") return { number: m[1], side: "back" };
+    }
     const isBack = /back|verso|\bb\b/i.test(rest);
     return { number: m[1], side: isBack ? "back" : "front" };
   }
@@ -1825,6 +1868,30 @@ const LOCAL_LANGS = [
     return f.name.toLowerCase().includes(q) || (f.number && f.number.includes(q));
   }
 
+  function imagePassesSetFilter(f){
+    if(!state.imagesSetFilter) return true;
+    return driveFileEncounterSet(f) === state.imagesSetFilter;
+  }
+
+  function populateImagesSetFilter(){
+    const sel = document.getElementById("imagesSetFilter");
+    if(!driveFiles.length || !REF_ROWS.length){
+      sel.hidden = true;
+      return;
+    }
+    const names = getReferenceEncounterSetNames();
+    const previous = state.imagesSetFilter;
+    sel.innerHTML = '<option value="">Tous les sets de rencontre</option>' +
+      names.map(function(n){ return '<option value="' + escapeHtml(n) + '">' + escapeHtml(n) + '</option>'; }).join("");
+    if(previous && names.includes(previous)){
+      sel.value = previous;
+    } else {
+      state.imagesSetFilter = "";
+      sel.value = "";
+    }
+    sel.hidden = false;
+  }
+
   function renderImagesGallery(){
     const main = document.getElementById("main");
     if(!driveFiles.length){
@@ -1834,10 +1901,10 @@ const LOCAL_LANGS = [
     }
 
     const q = state.filter.trim().toLowerCase();
-    const filtered = driveFiles.filter(function(f){ return imageMatchesFilter(f, q); });
+    const filtered = driveFiles.filter(function(f){ return imageMatchesFilter(f, q) && imagePassesSetFilter(f); });
 
     if(!filtered.length){
-      main.innerHTML = '<p class="empty-msg">Aucune image ne correspond à la recherche.</p>';
+      main.innerHTML = '<p class="empty-msg">Aucune image ne correspond à la recherche / au filtre.</p>';
       return;
     }
 
@@ -1958,7 +2025,11 @@ const LOCAL_LANGS = [
     document.getElementById("lightboxTextSource").textContent = sourceLabel;
 
     let bodyHtml = "";
-    const faces = [["front","avant"], ["back","arrière"]];
+    let faces = [["front","avant"], ["back","arrière"]];
+    // Si le nom de fichier Drive indique clairement une face (convention "-1"/"-2" de
+    // Cyclopean Foundations, ou back/verso), on n'affiche que le texte de cette face.
+    if(f.side === "front") faces = [["front","avant"]];
+    else if(f.side === "back") faces = [["back","arrière"]];
     if(showOrig){
       faces.forEach(function(pair){
         const faceData = sourceCard[pair[0]] || {};
@@ -1989,10 +2060,31 @@ const LOCAL_LANGS = [
       return;
     }
 
-    const groups = [
-      { key: "img-with-number", name: "Numéro détecté", items: driveFiles.filter(function(f){ return f.number && imageMatchesFilter(f, q); }) },
-      { key: "img-without-number", name: "Numéro non détecté", items: driveFiles.filter(function(f){ return !f.number && imageMatchesFilter(f, q); }) }
-    ];
+    const passesBase = function(f){ return imageMatchesFilter(f, q) && imagePassesSetFilter(f); };
+
+    let groups;
+    if(REF_ROWS.length){
+      // Regroupement par set de rencontre (ordre officiel = ordre du tableau de référence),
+      // avec un groupe "Sans correspondance" pour les fichiers non reconnus par le tableau.
+      groups = [];
+      getReferenceEncounterSetNames().forEach(function(setName){
+        groups.push({
+          key: "img-set-" + setName,
+          name: setName,
+          items: driveFiles.filter(function(f){ return passesBase(f) && driveFileEncounterSet(f) === setName; })
+        });
+      });
+      groups.push({
+        key: "img-set-none",
+        name: "Sans correspondance",
+        items: driveFiles.filter(function(f){ return passesBase(f) && !driveFileEncounterSet(f); })
+      });
+    } else {
+      groups = [
+        { key: "img-with-number", name: "Numéro détecté", items: driveFiles.filter(function(f){ return f.number && passesBase(f); }) },
+        { key: "img-without-number", name: "Numéro non détecté", items: driveFiles.filter(function(f){ return !f.number && passesBase(f); }) }
+      ];
+    }
 
     let totalShown = 0;
     groups.forEach(function(g){
@@ -2046,6 +2138,7 @@ const LOCAL_LANGS = [
   }
 
   function refreshImagesView(){
+    populateImagesSetFilter();
     buildImagesList();
     renderImagesGallery();
   }
@@ -2465,6 +2558,10 @@ const LOCAL_LANGS = [
     document.getElementById("historyPanel").hidden = mode !== "history";
     document.getElementById("driveImagePanel").hidden = mode !== "images";
     document.getElementById("historyFilterRow").hidden = mode !== "history";
+    if(mode !== "images"){
+      document.getElementById("imagesSetFilter").hidden = true;
+      state.imagesSetFilter = "";
+    }
     state.filter = "";
     document.getElementById("searchInput").value = "";
 
@@ -2550,6 +2647,11 @@ const LOCAL_LANGS = [
     try{ localStorage.setItem("dm_drive_campaign", this.value); } catch(e){}
     applyCampaignPreset();
   });
+  document.getElementById("imagesSetFilter").addEventListener("change", function(){
+    state.imagesSetFilter = this.value;
+    buildImagesList();
+    renderImagesGallery();
+  });
 
   // Tableau de référence (Google Sheet) : lien public, ou fichier CSV téléchargé en local.
   async function runRefSheetLoad(){
@@ -2572,6 +2674,7 @@ const LOCAL_LANGS = [
       statusEl.className = "source-status ok";
       statusEl.textContent = res.total + " ligne(s) chargée(s) — la traduction FR est cherchée automatiquement via ce tableau à l'ouverture d'une image.";
       if(!document.getElementById("imageLightbox").hidden) renderLightboxText();
+      if(state.viewMode === "images") refreshImagesView();
     } catch(err){
       console.error("[refsheet]", err);
       statusEl.className = "source-status err";
@@ -2640,8 +2743,29 @@ const LOCAL_LANGS = [
   document.getElementById("imageLightbox").addEventListener("click", function(e){
     if(e.target.id === "imageLightbox" || e.target.classList.contains("lightbox-body")) closeLightbox();
   });
+  // Liste des fichiers Drive actuellement visibles (recherche + filtre par set appliqués),
+  // dans l'ordre d'affichage de la galerie — sert à la navigation clavier ← → dans l'agrandissement.
+  function getVisibleImageIds(){
+    const q = state.filter.trim().toLowerCase();
+    return driveFiles
+      .filter(function(f){ return imageMatchesFilter(f, q) && imagePassesSetFilter(f); })
+      .map(function(f){ return f.id; });
+  }
+
   document.addEventListener("keydown", function(e){
     if(e.key === "Escape" && !document.getElementById("imageLightbox").hidden) closeLightbox();
+    if((e.key === "ArrowLeft" || e.key === "ArrowRight") && !document.getElementById("imageLightbox").hidden){
+      const tag = (document.activeElement && document.activeElement.tagName || "").toLowerCase();
+      if(tag === "input" || tag === "select" || tag === "textarea") return;
+      const ids = getVisibleImageIds();
+      if(ids.length < 2) return;
+      const idx = ids.indexOf(currentLightboxFileId);
+      if(idx === -1) return;
+      e.preventDefault();
+      const step = e.key === "ArrowRight" ? 1 : -1;
+      const nextIdx = (idx + step + ids.length) % ids.length;
+      selectImageFile(ids[nextIdx]);
+    }
   });
 
   document.getElementById("sourceLocalBtn").addEventListener("click", function(){
