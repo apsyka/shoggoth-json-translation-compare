@@ -77,6 +77,12 @@
   }
 
   *{ box-sizing: border-box; }
+  /* IMPORTANT : l'attribut `hidden` doit toujours l'emporter. Sans cette règle, n'importe
+     quelle classe qui définit `display` (ex. .lightbox-media{display:flex}) bat la règle
+     par défaut du navigateur `[hidden]{display:none}` et l'élément reste visible alors que
+     le code le croit masqué — c'est exactement ce qui faisait apparaître un encadré
+     « Version finale (Shoggoth) » vide, avec un lien « Ouvrir sur Drive » pointant vers « # ». */
+  [hidden]{ display: none !important; }
   body{
     background: var(--bg);
     color: var(--text);
@@ -877,9 +883,15 @@
                placeholder="https://github.com/owner/repo/tree/main/dossier">
         <div class="source-actions">
           <button type="button" id="sourceLoadBtn">Charger</button>
-          <button type="button" id="sourceLocalBtn" class="ghost">Fichiers locaux</button>
+          <button type="button" id="sourceLocalBtn" class="ghost">Fichiers du site</button>
         </div>
-        <p class="source-status" id="sourceStatus"></p>
+        <p class="source-body-or">— ou —</p>
+        <label class="source-label" for="sourceFiles">Fichiers JSON depuis mon ordinateur</label>
+        <input class="file-input" id="sourceFiles" type="file" accept="application/json,.json" multiple>
+        <div class="source-actions" style="margin-top:6px">
+          <button type="button" id="sourceFilesLoadBtn">Charger ces fichiers</button>
+        </div>
+        <p class="source-status" id="sourceStatus">Sélectionnez le project.json de la campagne (et, si vous voulez, ses fichiers de traduction) — c'est ce project.json qui sert à retrouver le texte et l'image finale de chaque carte dans l'onglet Images VO.</p>
       </div>
     </div>
 
@@ -1404,7 +1416,8 @@ const LOCAL_LANGS = [
       return ea < eb ? -1 : (ea > eb ? 1 : 0);
     });
 
-    return { project_name: project.name || "", cards: cards, skipped: skipped };
+    // "name" est la clé des exports Shoggoth ; "project_name" est toléré au cas où.
+    return { project_name: project.name || project.project_name || "", cards: cards, skipped: skipped };
   }
 
   function showFatalError(message, hint){
@@ -1438,7 +1451,78 @@ const LOCAL_LANGS = [
     }
   }
 
-  /* ---------------- Mode "fichiers locaux" ---------------- */
+  /* ---------------- Mode "fichiers importés depuis l'ordinateur" ---------------- */
+
+  function readFileAsText(file){
+    return new Promise(function(resolve, reject){
+      const reader = new FileReader();
+      reader.onload = function(){ resolve(reader.result); };
+      reader.onerror = function(){ reject(new Error("Lecture de « " + file.name + " » impossible.")); };
+      reader.readAsText(file, "utf-8");
+    });
+  }
+
+  // Charge un project.json (+ ses traductions éventuelles) directement depuis l'ordinateur,
+  // sans passer par GitHub. Indispensable quand le site est déployé avec les fichiers d'un
+  // autre projet : c'est le project.json chargé ici qui sert de référence à tout le reste,
+  // y compris à la correspondance des images dans l'onglet Images VO.
+  async function loadFromUploadedFiles(fileList){
+    const files = Array.from(fileList || []);
+    if(!files.length) throw new Error("Aucun fichier sélectionné.");
+
+    const parsed = [];
+    for(const file of files){
+      let data;
+      try{
+        data = JSON.parse(await readFileAsText(file));
+      } catch(e){
+        throw new Error("« " + file.name + " » n'est pas un JSON valide (" + e.message + ").");
+      }
+      parsed.push({ name: file.name, data: data });
+    }
+
+    let project = null, projectFile = null;
+    const translations = [];
+    parsed.forEach(function(entry){
+      if(isTranslationJson(entry.data)){
+        translations.push({ code: entry.data.language, file: entry.name, data: entry.data });
+      } else if(!project && entry.data && Array.isArray(entry.data.cards)){
+        // Plus tolérant que isBaseProjectJson : un export sans "encounter_sets" reste
+        // utilisable (les cartes se retrouvent alors dans « Cartes joueur / hors campagne »).
+        project = entry.data;
+        projectFile = entry.name;
+      }
+    });
+
+    if(!project){
+      throw new Error("Aucun project.json reconnu parmi les fichiers choisis (il lui faut une liste « cards »).");
+    }
+
+    const langs = translations.map(function(t){ return { code: t.code, label: languageLabel(t.code) }; });
+    setLangs(langs);
+    const langData = {};
+    translations.forEach(function(t){ langData[t.code] = t.data; });
+
+    CARD_DATA = mergeData(project, langData);
+
+    // Une source importée n'est pas rechargeable automatiquement à la visite suivante :
+    // on nettoie donc la source mémorisée et le paramètre ?source= de l'URL, pour ne pas
+    // faire réapparaître un autre projet au prochain F5.
+    state.sourceMode = "upload";
+    state.sourceUrl = "";
+    try{ localStorage.removeItem("dm_source"); } catch(e){}
+    try{
+      const url = new URL(window.location.href);
+      url.searchParams.delete("source");
+      window.history.replaceState({}, "", url);
+    } catch(e){}
+    document.getElementById("sourceModeLabel").textContent = "fichiers importés";
+
+    afterDataReady();
+    return { projectFile: projectFile, translations: translations.map(function(t){ return t.file; }) };
+  }
+
+  /* ---------------- Mode "fichiers du site" ---------------- */
 
   async function fetchJson(path){
     const r = await fetch(path, { cache: "no-cache" });
@@ -2563,6 +2647,23 @@ const LOCAL_LANGS = [
     if(e.key === "Enter"){
       const val = e.target.value;
       if(val.trim()) loadFromGithub(val);
+    }
+  });
+  document.getElementById("sourceFilesLoadBtn").addEventListener("click", async function(){
+    const input = document.getElementById("sourceFiles");
+    setStatus("Lecture des fichiers…");
+    try{
+      const res = await loadFromUploadedFiles(input.files);
+      const transLabel = res.translations.length
+        ? " + " + res.translations.length + " traduction(s) (" + res.translations.join(", ") + ")"
+        : " (aucune traduction)";
+      setStatus("Chargé : " + res.projectFile + transLabel, "ok");
+      // Les vues Images VO dépendent de ce project.json : on les rafraîchit tout de suite.
+      if(state.viewMode === "images") refreshImagesView();
+      if(!document.getElementById("imageLightbox").hidden) renderLightboxText();
+    } catch(err){
+      console.error("[fichiers importés]", err);
+      setStatus("Échec : " + err.message, "err");
     }
   });
   async function runDriveLoad(){
