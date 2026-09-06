@@ -367,7 +367,11 @@
     z-index: 100;
     background: rgba(0,0,0,0.82);
     display: flex;
-    align-items: center;
+    /* `align-items: center` couperait le haut du contenu quand il dépasse la hauteur de la
+       fenêtre, sans possibilité de remonter (le débordement se produit hors zone
+       scrollable). Le centrage se fait donc par `margin: auto` sur l'enfant, qui cède la
+       place au scroll dès qu'il manque de hauteur. */
+    align-items: flex-start;
     justify-content: center;
     padding: 40px 20px;
     cursor: zoom-out;
@@ -379,28 +383,35 @@
     align-items: flex-start;
     justify-content: center;
     gap: 24px;
-    max-width: 1400px;
+    max-width: min(1800px, 96vw);
     width: 100%;
+    margin: auto;
     cursor: default;
   }
+  /* `flex: 1 1 0` (et non `auto`) : les colonnes d'images se partagent l'espace disponible
+     au lieu de partir de leur largeur naturelle. Avec `auto`, deux cartes réclamaient
+     chacune leur pleine largeur et se chevauchaient. */
   .lightbox-media{
     display: flex;
     flex-direction: column;
     align-items: center;
     gap: 14px;
-    flex: 1 1 auto;
+    flex: 1 1 0;
     min-width: 0;
   }
   .lightbox-img-wrap{
     position: relative;
-    display: inline-block;
+    display: block;
     max-width: 100%;
   }
+  /* La largeur est relative au CONTENEUR (100%), jamais au viewport : une taille en vw
+     ignore le nombre de colonnes affichées et finit par déborder dès qu'il y en a deux. */
   .lightbox img{
-    max-width: min(60vw, 800px);
+    max-width: 100%;
     max-height: 82vh;
     width: auto;
     height: auto;
+    margin: 0 auto;
     border-radius: 10px;
     box-shadow: 0 12px 40px rgba(0,0,0,0.5);
     cursor: default;
@@ -448,11 +459,16 @@
   .lightbox-caption{
     display: flex;
     align-items: center;
-    gap: 16px;
+    justify-content: center;
+    flex-wrap: wrap;
+    gap: 6px 16px;
+    max-width: 100%;
     font-family: "IBM Plex Mono", monospace;
     font-size: 12.5px;
     color: #eee;
     cursor: default;
+    text-align: center;
+    overflow-wrap: anywhere;
   }
   .lightbox-caption a{ color: var(--amber, #e0a94e); }
   .lightbox-close{
@@ -471,7 +487,7 @@
   .lightbox-close:hover{ color: var(--amber, #e0a94e); }
 
   .lightbox-text{
-    flex: 1 1 380px;
+    flex: 0 1 380px;
     max-width: 440px;
     max-height: 86vh;
     overflow-y: auto;
@@ -502,9 +518,12 @@
     color: var(--text-faint);
     margin: 0 0 12px;
   }
-  @media (max-width: 900px){
+  /* En dessous, trois colonnes (scan + version finale + texte) deviennent trop étroites :
+     on empile. */
+  @media (max-width: 1100px){
     .lightbox-body{ flex-direction: column; align-items: center; }
-    .lightbox img{ max-width: min(88vw, 800px); max-height: 50vh; }
+    .lightbox-media{ width: min(88vw, 800px); flex: 0 0 auto; }
+    .lightbox img{ max-height: 50vh; }
     .lightbox-text{ max-width: min(88vw, 800px); width: 100%; max-height: none; }
   }
 
@@ -1662,13 +1681,29 @@ const LOCAL_LANGS = [
     else driveRotations[fileId] = deg;
     try{ localStorage.setItem("dm_drive_rotations", JSON.stringify(driveRotations)); } catch(e){}
   }
+  // Une rotation CSS ne change pas la place réservée par l'élément : une carte portrait
+  // pivotée d'un quart de tour devient visuellement plus large que sa colonne et déborde
+  // sur l'image voisine. On la réduit donc juste ce qu'il faut pour qu'elle y tienne.
+  function applyLightboxRotation(deg){
+    const img = document.getElementById("lightboxImg");
+    const wrap = img.parentElement;
+    if(!deg){ img.style.transform = ""; return; }
+    let transform = "rotate(" + deg + "deg)";
+    if(deg === 90 || deg === 270){
+      const availWidth = wrap ? wrap.clientWidth : 0;
+      const shownHeight = img.clientHeight || img.naturalHeight || 0;
+      if(availWidth && shownHeight && shownHeight > availWidth){
+        transform += " scale(" + (availWidth / shownHeight).toFixed(4) + ")";
+      }
+    }
+    img.style.transform = transform;
+  }
+
   function rotateImage(fileId){
     const next = (getRotation(fileId) + 90) % 360;
     setRotation(fileId, next);
     // Met à jour l'aperçu ouvert (lightbox) sans tout re-rendre.
-    if(currentLightboxFileId === fileId){
-      document.getElementById("lightboxImg").style.transform = next ? "rotate(" + next + "deg)" : "";
-    }
+    if(currentLightboxFileId === fileId) applyLightboxRotation(next);
     // Met à jour la vignette correspondante dans la galerie si elle est affichée.
     const tileImg = document.querySelector('#img-tile-' + CSS.escape(fileId) + ' img');
     if(tileImg) tileImg.style.transform = next ? "rotate(" + next + "deg)" : "";
@@ -2045,10 +2080,13 @@ const LOCAL_LANGS = [
     if(!f) return;
     currentLightboxFileId = id;
     const img = document.getElementById("lightboxImg");
+    const rot = getRotation(f.id);
+    // La mise à l'échelle d'une rotation dépend des dimensions réelles de l'image : on la
+    // recalcule une fois celle-ci chargée (à l'ouverture, elle ne l'est pas encore).
+    img.onload = function(){ applyLightboxRotation(getRotation(f.id)); };
     img.src = driveImageUrl(f.id, 1600);
     img.alt = f.name;
-    const rot = getRotation(f.id);
-    img.style.transform = rot ? "rotate(" + rot + "deg)" : "";
+    applyLightboxRotation(rot);
     document.getElementById("lightboxCaption").textContent = imageLabel(f);
     document.getElementById("lightboxOpenOriginal").href = "https://drive.google.com/file/d/" + encodeURIComponent(f.id) + "/view";
     document.getElementById("imageLightbox").hidden = false;
