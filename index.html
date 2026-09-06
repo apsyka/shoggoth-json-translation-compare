@@ -606,6 +606,32 @@
     z-index: 103;
   }
 
+  .resume-bar{
+    margin: 0 0 18px;
+    padding: 10px 14px;
+    border-radius: 8px;
+    border: 1px solid var(--border-strong);
+    background: var(--surface-alt);
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 12px;
+    color: var(--text-dim);
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
+  }
+  .resume-bar strong{ color: var(--text); }
+  .resume-btn{
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 11.5px;
+    padding: 6px 12px;
+    border-radius: 7px;
+    border: 1px solid var(--accent);
+    background: var(--accent);
+    color: var(--accent-contrast);
+    cursor: pointer;
+  }
+
   .mismatch-banner{
     margin: 0 0 18px;
     padding: 12px 16px;
@@ -1132,30 +1158,55 @@
           <option value="cyclopean">Cyclopean Foundations (dossier officiel)</option>
           <option value="custom">Personnalisé — mon propre dossier</option>
         </select>
-        <label class="source-label" for="driveFolderInput" style="margin-top:6px">Dossier Google Drive (lien de partage)</label>
-        <input class="search-input" id="driveFolderInput" type="text" autocomplete="off"
-               placeholder="https://drive.google.com/drive/folders/…">
-        <label class="source-label" for="driveApiKeyInput" style="margin-top:6px">Clé API Google (Drive API)</label>
-        <input class="search-input" id="driveApiKeyInput" type="text" autocomplete="off" placeholder="AIza…">
+        <p class="source-status" id="serverModeRow" hidden><span id="serverModeInfo"></span></p>
+        <div id="driveFolderRow">
+          <label class="source-label" for="driveFolderInput" style="margin-top:6px">Dossier Google Drive (lien de partage)</label>
+          <input class="search-input" id="driveFolderInput" type="text" autocomplete="off"
+                 placeholder="https://drive.google.com/drive/folders/…">
+        </div>
+        <div id="driveKeyRow">
+          <label class="source-label" for="driveApiKeyInput" style="margin-top:6px">Clé API Google (Drive API)</label>
+          <input class="search-input" id="driveApiKeyInput" type="text" autocomplete="off" placeholder="AIza…">
+        </div>
         <div class="source-actions">
           <button type="button" id="driveLoadBtn">Charger les images</button>
         </div>
         <p class="source-status" id="driveStatus">Voir le README pour créer la clé API (gratuit, 2 min). Le texte affiché pour chaque image vient uniquement du project.json chargé dans l'onglet « Traductions » (correspondance par numéro).</p>
 
-        <label class="source-label" for="shoggothFolderInput" style="margin-top:14px">Dossier Google Drive — images finales Shoggoth (optionnel)</label>
-        <input class="search-input" id="shoggothFolderInput" type="text" autocomplete="off"
-               placeholder="https://drive.google.com/drive/folders/…">
+        <div id="shoggothFolderRow">
+          <label class="source-label" for="shoggothFolderInput" style="margin-top:14px">Dossier Google Drive — images finales Shoggoth (optionnel)</label>
+          <input class="search-input" id="shoggothFolderInput" type="text" autocomplete="off"
+                 placeholder="https://drive.google.com/drive/folders/…">
+        </div>
         <div class="source-actions" style="margin-top:6px">
           <button type="button" id="shoggothLoadBtn">Charger les images finales</button>
         </div>
         <p class="source-status" id="shoggothStatus">Optionnel : un dossier Drive avec les images finales exportées depuis Shoggoth, pour les comparer directement au scan à côté (nom de fichier attendu : identifiant de la carte en tête, ex. « 0c287f33-e134-4759-9bc2-7fab82e87a1b_nom_front_1.png »). Réutilise la même clé API que ci-dessus.</p>
 
         <label class="source-label" style="margin-top:14px">Relecture</label>
+        <p class="source-status" id="serverSyncStatus" hidden></p>
+        <div id="writeTokenRow" hidden>
+          <label class="source-label" for="writeTokenInput">Jeton d'écriture (pour enregistrer sur le serveur)</label>
+          <input class="search-input" id="writeTokenInput" type="password" autocomplete="off" placeholder="…">
+          <div class="source-actions" style="margin-top:6px">
+            <button type="button" id="writeTokenSaveBtn">Enregistrer le jeton</button>
+          </div>
+        </div>
         <div class="source-actions">
           <button type="button" id="reviewExportBtn">Exporter les cartes signalées (CSV)</button>
         </div>
         <div class="source-actions" style="margin-top:6px">
+          <button type="button" id="reviewBackupBtn">Sauvegarder l'avancement</button>
+        </div>
+        <p class="source-body-or">— restaurer —</p>
+        <input class="file-input" id="reviewRestoreFile" type="file" accept="application/json,.json">
+        <div class="source-actions" style="margin-top:6px">
+          <button type="button" id="reviewRestoreBtn" class="ghost">Restaurer cette sauvegarde</button>
+        </div>
+        <p class="source-status" id="reviewBackupStatus"></p>
+        <div class="source-actions" style="margin-top:6px">
           <button type="button" id="reviewResetBtn" class="ghost">Réinitialiser la relecture</button>
+          <button type="button" id="projectForgetBtn" class="ghost">Oublier le fichier mémorisé</button>
         </div>
         <p class="source-status" id="reviewStatus">Marquez chaque carte relue (touche <b>V</b>) ou à corriger (touche <b>P</b>) pendant que vous comparez ; l'avancement est mémorisé dans ce navigateur, par campagne. L'export reprend les cartes signalées avec vos notes et les alertes typographiques détectées.</p>
       </div>
@@ -1574,6 +1625,18 @@ const LOCAL_LANGS = [
     else if(state.viewMode === "images") refreshImagesView();
     else buildList();
   });
+  // Entrée ouvre directement la première carte trouvée : taper « 48 » puis Entrée suffit
+  // pour aller à la carte 48, sans la chercher dans la liste.
+  document.getElementById("searchInput").addEventListener("keydown", function(e){
+    if(e.key !== "Enter" || state.viewMode !== "images") return;
+    const groups = visibleGroups();
+    if(!groups.length) return;
+    e.preventDefault();
+    // Un numéro saisi tel quel l'emporte sur une correspondance partielle (« 48 » avant « 148 »).
+    const q = state.filter.trim();
+    const exact = groups.find(function(g){ return g.number && String(parseInt(g.number, 10)) === String(parseInt(q, 10)); });
+    selectCardGroup((exact || groups[0]).key);
+  });
 
   // ---- fusion original + traductions (equivalent JS de build.py) ----
   function side(obj){
@@ -1700,6 +1763,60 @@ const LOCAL_LANGS = [
 
   /* ---------------- Mode "fichiers importés depuis l'ordinateur" ---------------- */
 
+  // Le project.json importé est conservé dans le navigateur (~660 Ko pour Cyclopean, très
+  // en dessous des ~5 Mo qu'accepte un site) et rechargé au démarrage.
+  // Volontairement NON rangé par campagne, contrairement à la clé API : il est choisi depuis
+  // l'onglet Traductions, où la campagne n'est pas encore connue — le ranger par campagne
+  // faisait qu'on ne le retrouvait plus dès qu'on changeait de campagne ensuite. C'est de
+  // toute façon la bannière d'alerte qui protège contre un project.json qui ne correspond
+  // pas aux images affichées.
+  function projectStorageKey(){ return "dm_project_data"; }
+
+  function storeUploadedProject(project, projectFile, translations){
+    try{
+      localStorage.setItem(projectStorageKey(), JSON.stringify({
+        savedAt: Date.now(),
+        projectFile: projectFile,
+        project: project,
+        translations: translations.map(function(t){ return { code: t.code, file: t.file, data: t.data }; })
+      }));
+      return true;
+    } catch(e){
+      // Quota dépassé : on continue sans mémoriser plutôt que de faire échouer le chargement.
+      console.warn("[projet] impossible de mémoriser le fichier dans ce navigateur :", e);
+      return false;
+    }
+  }
+
+  function readStoredProject(){
+    try{
+      const raw = localStorage.getItem(projectStorageKey());
+      return raw ? JSON.parse(raw) : null;
+    } catch(e){ return null; }
+  }
+
+  function forgetStoredProject(){
+    try{ localStorage.removeItem(projectStorageKey()); } catch(e){}
+  }
+
+  // Rejoue un project.json mémorisé sans repasser par le sélecteur de fichiers.
+  function applyStoredProject(stored){
+    if(!stored || !stored.project) return false;
+    const translations = stored.translations || [];
+    setLangs(translations.map(function(t){ return { code: t.code, label: languageLabel(t.code) }; }));
+    const langData = {};
+    translations.forEach(function(t){ langData[t.code] = t.data; });
+    CARD_DATA = mergeData(stored.project, langData);
+    state.sourceMode = "upload";
+    state.sourceUrl = "";
+    document.getElementById("sourceModeLabel").textContent = "fichiers importés";
+    afterDataReady();
+    setStatus("Rechargé depuis ce navigateur : " + (stored.projectFile || "project.json") +
+              (translations.length ? " + " + translations.length + " traduction(s)" : "") +
+              " — mémorisé le " + new Date(stored.savedAt || Date.now()).toLocaleDateString("fr-FR") + ".", "ok");
+    return true;
+  }
+
   function readFileAsText(file){
     return new Promise(function(resolve, reject){
       const reader = new FileReader();
@@ -1765,8 +1882,17 @@ const LOCAL_LANGS = [
     } catch(e){}
     document.getElementById("sourceModeLabel").textContent = "fichiers importés";
 
+    // Le fichier est conservé dans ce navigateur pour être rechargé tout seul à la prochaine
+    // visite : sans ça, il fallait le re-sélectionner à chaque ouverture, et l'oublier
+    // signifiait comparer les images à un tout autre projet.
+    const stored = storeUploadedProject(project, projectFile, translations);
+
     afterDataReady();
-    return { projectFile: projectFile, translations: translations.map(function(t){ return t.file; }) };
+    return {
+      projectFile: projectFile,
+      translations: translations.map(function(t){ return t.file; }),
+      stored: stored
+    };
   }
 
   /* ---------------- Mode "fichiers du site" ---------------- */
@@ -1934,6 +2060,181 @@ const LOCAL_LANGS = [
     }
   };
 
+  /* ==========================================================================
+     MODE SERVEUR (Cloudflare Worker) — optionnel
+     Si le site est servi par le Worker, il expose /api/… : la clé Google reste alors
+     côté serveur et l'avancement de relecture y est stocké (il survit au nettoyage du
+     navigateur et suit d'une machine à l'autre).
+     Si ces routes n'existent pas (site ouvert en local, hébergement statique simple),
+     TOUT continue de fonctionner comme avant, avec la clé saisie dans le navigateur.
+     ========================================================================== */
+
+  const SERVER = { available: false, campaigns: [], writeConfigured: false, byKey: {} };
+  let serverPushTimer = null;
+
+  function writeTokenKey(){ return "dm_write_token"; }
+  function getWriteToken(){
+    try{ return localStorage.getItem(writeTokenKey()) || ""; } catch(e){ return ""; }
+  }
+  function setWriteToken(v){
+    try{ if(v) localStorage.setItem(writeTokenKey(), v); else localStorage.removeItem(writeTokenKey()); } catch(e){}
+  }
+
+  function isServerCampaign(key){ return SERVER.available && !!SERVER.byKey[key]; }
+
+  async function detectServer(){
+    try{
+      const r = await fetch("api/campaigns", { cache: "no-store" });
+      if(!r.ok) return false;
+      const data = await r.json();
+      if(!data || !Array.isArray(data.campaigns) || !data.campaigns.length) return false;
+      SERVER.available = true;
+      SERVER.campaigns = data.campaigns;
+      SERVER.writeConfigured = !!data.write_configured;
+      SERVER.byKey = {};
+      data.campaigns.forEach(function(c){ SERVER.byKey[c.key] = c; });
+      return true;
+    } catch(e){
+      return false; // pas de serveur : mode autonome, rien à signaler
+    }
+  }
+
+  // Les campagnes viennent alors du serveur : changer un lien Drive qui ne répond plus se
+  // fait dans sa configuration, sans retoucher ni redéployer le site.
+  function applyServerCampaigns(){
+    if(!SERVER.available) return;
+    const sel = document.getElementById("driveCampaignSelect");
+    const previous = sel.value;
+    sel.innerHTML = SERVER.campaigns.map(function(c){
+      return '<option value="' + escapeHtml(c.key) + '">' + escapeHtml(c.label) + '</option>';
+    }).join("") + '<option value="custom">Personnalisé — mon propre dossier</option>';
+    sel.value = SERVER.byKey[previous] ? previous : (SERVER.campaigns[0] ? SERVER.campaigns[0].key : "custom");
+    document.getElementById("serverModeRow").hidden = false;
+    updateServerUi();
+  }
+
+  // En mode serveur, ni le dossier ni la clé API n'ont à être saisis : on masque ces champs
+  // pour la campagne concernée, tout en les gardant disponibles en mode « Personnalisé ».
+  function updateServerUi(){
+    const camp = campaignKey();
+    const managed = isServerCampaign(camp);
+    ["driveFolderRow", "driveKeyRow", "shoggothFolderRow"].forEach(function(id){
+      const el = document.getElementById(id);
+      if(el) el.hidden = managed;
+    });
+    const info = document.getElementById("serverModeInfo");
+    if(info){
+      const c = SERVER.byKey[camp];
+      info.textContent = managed
+        ? "Dossiers et clé API gérés par le serveur" + (c && !c.has_finals ? " (aucun dossier d'images finales configuré)" : "") + "."
+        : "Campagne personnalisée : dossiers et clé API saisis dans ce navigateur.";
+    }
+    renderSyncStatus();
+  }
+
+  async function loadListingFromServer(campaign, kind){
+    const r = await fetch("api/drive/" + encodeURIComponent(campaign) + "/" + kind, { cache: "no-store" });
+    const data = await r.json().catch(function(){ return null; });
+    if(!r.ok) throw new Error((data && data.error) || ("Serveur : HTTP " + r.status));
+    return (data && data.files) || [];
+  }
+
+  /* --- Synchronisation de l'avancement ------------------------------------- */
+
+  function renderSyncStatus(text, kind){
+    const el = document.getElementById("serverSyncStatus");
+    if(!el) return;
+    if(!SERVER.available || !isServerCampaign(campaignKey())){
+      el.hidden = true;
+      return;
+    }
+    el.hidden = false;
+    if(text){
+      el.className = "source-status" + (kind ? " " + kind : "");
+      el.textContent = text;
+      return;
+    }
+    if(!SERVER.writeConfigured){
+      el.className = "source-status err";
+      el.textContent = "Serveur en lecture seule : aucun jeton d'écriture n'y est configuré.";
+    } else if(!getWriteToken()){
+      el.className = "source-status err";
+      el.textContent = "Lecture seule : saisissez le jeton d'écriture pour enregistrer votre avancement sur le serveur.";
+    } else {
+      el.className = "source-status ok";
+      el.textContent = "Avancement synchronisé avec le serveur.";
+    }
+  }
+
+  function mergeReviewEntries(incoming){
+    let changed = 0;
+    Object.keys(incoming || {}).forEach(function(key){
+      const next = incoming[key];
+      if(!next) return;
+      const current = reviewData[key];
+      if(!current || (next.ts || 0) > (current.ts || 0)){ reviewData[key] = next; changed++; }
+    });
+    if(changed) saveReviewData();
+    return changed;
+  }
+
+  async function pullServerReview(){
+    const camp = campaignKey();
+    if(!isServerCampaign(camp)) return;
+    try{
+      const r = await fetch("api/review/" + encodeURIComponent(camp), { cache: "no-store" });
+      if(!r.ok) return;
+      const data = await r.json();
+      const changed = mergeReviewEntries(data && data.review);
+      if(changed && state.viewMode === "images") refreshImagesView();
+      renderBackupStatus();
+      renderSyncStatus();
+    } catch(e){
+      renderSyncStatus("Serveur injoignable : votre avancement reste enregistré dans ce navigateur.", "err");
+    }
+  }
+
+  // On n'envoie pas à chaque touche : les écritures sont regroupées après une courte pause.
+  // Utile pour rester loin des quotas et pour ne pas saturer le réseau en relisant vite.
+  function scheduleServerPush(){
+    if(!SERVER.available || !isServerCampaign(campaignKey())) return;
+    if(!getWriteToken() || !SERVER.writeConfigured) return;
+    renderSyncStatus("Modifications non encore envoyées…", "");
+    if(serverPushTimer) clearTimeout(serverPushTimer);
+    serverPushTimer = setTimeout(pushServerReview, 2500);
+  }
+
+  async function pushServerReview(){
+    const camp = campaignKey();
+    if(!isServerCampaign(camp)) return;
+    const token = getWriteToken();
+    if(!token || !SERVER.writeConfigured) return;
+    try{
+      const r = await fetch("api/review/" + encodeURIComponent(camp), {
+        method: "PUT",
+        headers: { "content-type": "application/json", "authorization": "Bearer " + token },
+        body: JSON.stringify({ review: reviewData, project_name: CARD_DATA.project_name || "" })
+      });
+      const data = await r.json().catch(function(){ return null; });
+      if(!r.ok){
+        renderSyncStatus("Envoi refusé : " + ((data && data.error) || ("HTTP " + r.status)), "err");
+        return;
+      }
+      // Le serveur renvoie la version consolidée : on l'adopte pour converger avec les
+      // autres machines qui auraient travaillé en parallèle.
+      const changed = mergeReviewEntries(data && data.review);
+      if(changed && state.viewMode === "images") refreshImagesView();
+      renderSyncStatus("Enregistré sur le serveur à " + new Date().toLocaleTimeString("fr-FR") + ".", "ok");
+    } catch(e){
+      renderSyncStatus("Envoi impossible (serveur injoignable). Vos modifications restent dans ce navigateur.", "err");
+    }
+  }
+
+  // Dernière chance d'envoyer avant que l'onglet ne disparaisse.
+  window.addEventListener("pagehide", function(){
+    if(serverPushTimer){ clearTimeout(serverPushTimer); pushServerReview(); }
+  });
+
   // Tout ce qui est propre à une campagne (clé API, tableau de référence, texte d'origine)
   // est mémorisé sous une clé de stockage séparée par campagne, pour qu'un réglage fait sur
   // un projet (ex. "Dark Matter" en dossier personnalisé) ne se retrouve jamais appliqué,
@@ -1980,6 +2281,7 @@ const LOCAL_LANGS = [
     state.imagesStatusFilter = "";
     // Les statuts de relecture appartiennent à la campagne : on recharge les siens.
     loadReviewData();
+    renderBackupStatus();
 
     document.getElementById("driveStatus").className = "source-status";
     document.getElementById("driveStatus").textContent = DEFAULT_DRIVE_STATUS;
@@ -1997,12 +2299,25 @@ const LOCAL_LANGS = [
     if(state.viewMode === "images") refreshImagesView();
     if(!document.getElementById("imageLightbox").hidden) renderLightboxText();
 
+    // En mode serveur, ni clé ni dossier ne sont nécessaires : le Worker les connaît.
+    const managed = isServerCampaign(campaignKey());
+    if(managed){
+      updateServerUi();
+      if(autoLoad){
+        runDriveLoad();
+        if(SERVER.byKey[campaignKey()] && SERVER.byKey[campaignKey()].has_finals) runShoggothLoad();
+        pullServerReview();
+      }
+      return;
+    }
+
     if(autoLoad && savedKey && document.getElementById("driveFolderInput").value.trim()){
       runDriveLoad();
     }
     if(autoLoad && savedKey && savedShoggothFolder){
       runShoggothLoad();
     }
+    updateServerUi();
   }
 
   // Correspondance image Drive <-> carte du JSON : uniquement via le numéro détecté dans le
@@ -2140,6 +2455,33 @@ const LOCAL_LANGS = [
     return { cardId: m[1], side: side };
   }
 
+  // Variantes « mode serveur » : mêmes traitements, mais la liste des fichiers vient du
+  // Worker (qui détient la clé API) au lieu d'un appel direct depuis le navigateur.
+  async function loadDriveImagesFromServer(campaign){
+    const rawFiles = await loadListingFromServer(campaign, "scans");
+    const files = rawFiles.map(function(f){
+      const c = classifyDriveFilename(f.name);
+      return { id: f.id, name: f.name, number: c ? c.number : null, side: c ? c.side : null };
+    });
+    files.sort(function(a, b){
+      const na = a.number ? parseInt(a.number, 10) : Infinity;
+      const nb = b.number ? parseInt(b.number, 10) : Infinity;
+      if(na !== nb) return na - nb;
+      return a.name.localeCompare(b.name);
+    });
+    driveFiles = files;
+    return { total: files.length, withNumber: files.filter(function(f){ return f.number; }).length };
+  }
+
+  async function loadShoggothImagesFromServer(campaign){
+    const rawFiles = await loadListingFromServer(campaign, "finals");
+    shoggothFiles = rawFiles.map(function(f){
+      const c = classifyShoggothFilename(f.name);
+      return { id: f.id, name: f.name, cardId: c ? c.cardId : null, side: c ? c.side : null };
+    }).filter(function(f){ return f.cardId; });
+    return { total: shoggothFiles.length };
+  }
+
   async function loadShoggothImages(folderInputVal, apiKey){
     const folderId = parseGoogleDriveFolderId(folderInputVal);
     if(!folderId) throw new Error("Lien de dossier Google Drive invalide.");
@@ -2238,29 +2580,170 @@ const LOCAL_LANGS = [
 
   function saveReviewData(){
     try{ localStorage.setItem(reviewStorageKey(), JSON.stringify(reviewData)); } catch(e){}
+    // Le navigateur reste la copie de travail ; le serveur, quand il existe, en reçoit une
+    // copie peu après (regroupée, pas à chaque frappe).
+    if(typeof scheduleServerPush === "function") scheduleServerPush();
   }
 
-  function getReview(key){ return (key && reviewData[key]) || null; }
+  // Une entrée « vidée » n'est pas supprimée mais marquée `cleared`, avec sa date.
+  // Sans ça, retirer un ✓ ne se propagerait jamais au serveur : la fusion ne sait
+  // qu'ajouter, et l'ancien ✓ reviendrait à la synchronisation suivante.
+  function getReview(key){
+    const entry = key && reviewData[key];
+    if(!entry || entry.cleared) return null;
+    return entry;
+  }
+
+  /* --- Sauvegarde en fichier ---------------------------------------------------
+     Tout l'avancement vit dans le navigateur : un nettoyage de l'historique, un autre
+     ordinateur ou un profil réinitialisé et il disparaît. Ces deux fonctions permettent
+     de le déposer dans un fichier et de le récupérer. --------------------------- */
+
+  function reviewBackupTimeKey(){ return campaignScopedKey("dm_review_backup_at"); }
+
+  function reviewLastBackupAt(){
+    try{ return parseInt(localStorage.getItem(reviewBackupTimeKey()), 10) || 0; } catch(e){ return 0; }
+  }
+
+  function reviewLastChangeAt(){
+    let last = 0;
+    Object.keys(reviewData).forEach(function(k){
+      const ts = reviewData[k] && reviewData[k].ts;
+      if(ts && ts > last) last = ts;
+    });
+    return last;
+  }
+
+  function reviewEntryCount(){
+    return Object.keys(reviewData).filter(function(k){ return !!getReview(k); }).length;
+  }
+
+  function renderBackupStatus(){
+    const el = document.getElementById("reviewBackupStatus");
+    if(!el) return;
+    const count = reviewEntryCount();
+    if(!count){
+      el.className = "source-status";
+      el.textContent = "Aucun statut ni note pour l'instant. Pensez à sauvegarder de temps en temps : tout est stocké dans ce navigateur uniquement.";
+      return;
+    }
+    const backupAt = reviewLastBackupAt();
+    const changeAt = reviewLastChangeAt();
+    if(!backupAt){
+      el.className = "source-status err";
+      el.textContent = count + " carte(s) annotée(s), jamais sauvegardées. Un nettoyage du navigateur les perdrait — sauvegardez le fichier.";
+    } else if(changeAt > backupAt){
+      el.className = "source-status err";
+      el.textContent = count + " carte(s) annotée(s) · modifications non sauvegardées depuis le " +
+        new Date(backupAt).toLocaleString("fr-FR") + ".";
+    } else {
+      el.className = "source-status ok";
+      el.textContent = count + " carte(s) annotée(s) · sauvegardé le " + new Date(backupAt).toLocaleString("fr-FR") + ".";
+    }
+  }
+
+  function downloadBlob(blob, filename){
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(function(){ URL.revokeObjectURL(url); }, 1000);
+  }
+
+  function backupReviewToFile(){
+    const payload = {
+      format: "dm-relecture",
+      version: 1,
+      campaign: campaignKey(),
+      project_name: CARD_DATA.project_name || "",
+      savedAt: Date.now(),
+      review: reviewData,
+      rotations: driveRotations
+    };
+    const stamp = new Date().toISOString().slice(0, 10);
+    downloadBlob(new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" }),
+                 "relecture-" + (CARD_DATA.project_name || campaignKey()).replace(/[^\w-]+/g, "_") + "-" + stamp + ".json");
+    try{ localStorage.setItem(reviewBackupTimeKey(), String(Date.now())); } catch(e){}
+    renderBackupStatus();
+  }
+
+  // Restauration NON destructive : on fusionne, et en cas de conflit sur une même carte
+  // c'est l'entrée la plus récente qui gagne. Restaurer une vieille sauvegarde n'efface
+  // donc pas le travail fait depuis.
+  function restoreReviewFromPayload(payload){
+    if(!payload || payload.format !== "dm-relecture" || !payload.review){
+      throw new Error("Ce fichier n'est pas une sauvegarde de relecture.");
+    }
+    let added = 0, updated = 0, kept = 0;
+    Object.keys(payload.review).forEach(function(key){
+      const incoming = payload.review[key];
+      if(!incoming) return;
+      const current = reviewData[key];
+      if(!current){ reviewData[key] = incoming; added++; }
+      else if((incoming.ts || 0) > (current.ts || 0)){ reviewData[key] = incoming; updated++; }
+      else kept++;
+    });
+    if(payload.rotations){
+      Object.keys(payload.rotations).forEach(function(id){
+        if(driveRotations[id] === undefined) driveRotations[id] = payload.rotations[id];
+      });
+      try{ localStorage.setItem("dm_drive_rotations", JSON.stringify(driveRotations)); } catch(e){}
+    }
+    saveReviewData();
+    return { added: added, updated: updated, kept: kept, campaign: payload.campaign, project: payload.project_name };
+  }
+
+  /* --- Annulation du dernier statut (Ctrl+Z) --- */
+  const reviewUndoStack = [];
+  function pushUndo(key, previous){
+    reviewUndoStack.push({ key: key, previous: previous ? JSON.parse(JSON.stringify(previous)) : null });
+    if(reviewUndoStack.length > 30) reviewUndoStack.shift();
+  }
+  function undoLastReview(){
+    const last = reviewUndoStack.pop();
+    if(!last) return false;
+    if(last.previous){
+      // On redate l'entrée restaurée : sinon une version plus récente venue du serveur
+      // écraserait aussitôt l'annulation.
+      last.previous.ts = Date.now();
+      reviewData[last.key] = last.previous;
+    } else {
+      reviewData[last.key] = { ts: Date.now(), cleared: true };
+    }
+    saveReviewData();
+    return true;
+  }
+
+  function storeReviewEntry(key, entry){
+    entry.ts = Date.now();
+    if(!entry.status && !entry.note){
+      // Plus rien à retenir : on garde une trace datée de l'effacement (voir getReview).
+      reviewData[key] = { ts: entry.ts, cleared: true };
+    } else {
+      delete entry.cleared;
+      reviewData[key] = entry;
+    }
+    saveReviewData();
+  }
 
   function setReviewStatus(key, status){
     if(!key) return;
-    const entry = reviewData[key] || {};
+    const current = getReview(key);
+    const entry = current ? Object.assign({}, current) : {};
     // Recliquer sur le statut déjà posé l'enlève : un aller-retour, pas un cul-de-sac.
     entry.status = (entry.status === status) ? null : status;
-    entry.ts = Date.now();
-    if(!entry.status && !entry.note) delete reviewData[key];
-    else reviewData[key] = entry;
-    saveReviewData();
+    storeReviewEntry(key, entry);
   }
 
   function setReviewNote(key, note){
     if(!key) return;
-    const entry = reviewData[key] || {};
+    const current = getReview(key);
+    const entry = current ? Object.assign({}, current) : {};
     entry.note = note;
-    entry.ts = Date.now();
-    if(!entry.status && !note) delete reviewData[key];
-    else reviewData[key] = entry;
-    saveReviewData();
+    storeReviewEntry(key, entry);
   }
 
   /* ==========================================================================
@@ -2513,11 +2996,17 @@ const LOCAL_LANGS = [
   function toggleReviewStatus(status){
     const g = groupsByKey[state.activeGroupKey];
     if(!g) return;
+    pushUndo(g.key, getReview(g.key));
     setReviewStatus(g.key, status);
-    renderReviewControls(g);
+    afterReviewChange(g);
+  }
+
+  function afterReviewChange(g){
+    if(g) renderReviewControls(g);
     populateImagesStatusFilter(); // les compteurs du filtre suivent immédiatement
     buildImagesList();
     renderImagesGallery();
+    renderBackupStatus();
   }
 
   /* ---------------- Loupe (zoom au survol) ---------------- */
@@ -2645,6 +3134,7 @@ const LOCAL_LANGS = [
     let html = '<div class="topbar"><div><p class="breadcrumb">Google Drive' + projectHint + '</p>' +
       '<h2 class="card-title">Cartes à relire</h2></div></div>';
     html += projectMismatchBannerHtml();
+    html += resumeBannerHtml();
     html += '<div class="image-grid">';
     groups.forEach(function(g){
       const f = g.front;
@@ -2945,8 +3435,27 @@ const LOCAL_LANGS = [
     renderReviewProgress();
   }
 
+  // Dernière carte ouverte : mémorisée par campagne pour proposer de reprendre là où on
+  // s'était arrêté, plutôt que de rechercher où on en était dans 300 vignettes.
+  function rememberLastCard(groupKey){
+    try{ localStorage.setItem(campaignScopedKey("dm_last_card"), groupKey || ""); } catch(e){}
+  }
+  function readLastCard(){
+    try{ return localStorage.getItem(campaignScopedKey("dm_last_card")) || ""; } catch(e){ return ""; }
+  }
+
+  function resumeBannerHtml(){
+    const key = readLastCard();
+    if(!key || state.activeGroupKey) return "";
+    const g = groupsByKey[key];
+    if(!g) return "";
+    return '<div class="resume-bar">Dernière carte relue : <strong>' + escapeHtml(groupLabel(g)) + '</strong>' +
+      ' <button type="button" class="resume-btn" data-resume="' + escapeHtml(key) + '">Reprendre ici</button></div>';
+  }
+
   function selectCardGroup(groupKey, face){
     state.activeGroupKey = groupKey;
+    rememberLastCard(groupKey);
     buildImagesList();
     const tile = document.getElementById("img-tile-" + groupKey);
     if(tile){
@@ -3466,7 +3975,9 @@ const LOCAL_LANGS = [
     statusEl.className = "source-status";
     statusEl.textContent = "Chargement du dossier Drive…";
     try{
-      const res = await loadDriveImages(folderVal, apiKey);
+      const res = isServerCampaign(campaignKey())
+        ? await loadDriveImagesFromServer(campaignKey())
+        : await loadDriveImages(folderVal, apiKey);
       statusEl.className = "source-status ok";
       statusEl.textContent = res.total + " image(s) trouvée(s), " + res.withNumber + " avec un numéro détecté.";
       document.getElementById("driveSourceModeLabel").textContent = res.total + " image(s)";
@@ -3490,7 +4001,9 @@ const LOCAL_LANGS = [
     try{ localStorage.setItem("dm_drive_campaign", this.value); } catch(e){}
     applyCampaignPreset();
     document.getElementById("driveSourceModeLabel").textContent =
-      CAMPAIGN_PRESETS[this.value] ? CAMPAIGN_PRESETS[this.value].label : "Personnalisé";
+      SERVER.byKey[this.value] ? SERVER.byKey[this.value].label
+      : (CAMPAIGN_PRESETS[this.value] ? CAMPAIGN_PRESETS[this.value].label : "Personnalisé");
+    updateServerUi();
     // La clé API est propre à chaque campagne : on la recharge ici pour ne jamais
     // mélanger deux projets (ex. Dark Matter en dossier personnalisé vs Cyclopean Foundations).
     loadCampaignScopedState(true);
@@ -3512,7 +4025,9 @@ const LOCAL_LANGS = [
     statusEl.className = "source-status";
     statusEl.textContent = "Chargement des images finales…";
     try{
-      const res = await loadShoggothImages(folderVal, apiKey);
+      const res = isServerCampaign(campaignKey())
+        ? await loadShoggothImagesFromServer(campaignKey())
+        : await loadShoggothImages(folderVal, apiKey);
       statusEl.className = "source-status ok";
       statusEl.textContent = res.total + " image(s) finale(s) trouvée(s) et reconnue(s) par leur identifiant de carte.";
       if(!document.getElementById("imageLightbox").hidden) renderLightboxText();
@@ -3531,6 +4046,8 @@ const LOCAL_LANGS = [
   // Clic sur une vignette de la galerie → agrandissement (lightbox), sans quitter la page.
   // Le bouton de rotation sur la vignette a priorité et ne doit pas ouvrir l'agrandissement.
   document.getElementById("main").addEventListener("click", function(e){
+    const resumeBtn = e.target.closest("[data-resume]");
+    if(resumeBtn){ selectCardGroup(resumeBtn.dataset.resume); return; }
     const rotateBtn = e.target.closest(".rotate-btn-tile[data-rotate-id]");
     if(rotateBtn){
       e.stopPropagation();
@@ -3567,10 +4084,23 @@ const LOCAL_LANGS = [
   document.addEventListener("keydown", function(e){
     const lightboxOpen = !document.getElementById("imageLightbox").hidden;
     if(e.key === "Escape" && lightboxOpen){ closeLightbox(); return; }
+
+    // Ctrl+Z annule le dernier ✓ / ⚠ posé — la fausse manip la plus facile à faire quand on
+    // enchaîne les cartes au clavier. Actif même hors agrandissement, sauf pendant une saisie
+    // (où Ctrl+Z doit rester l'annulation de texte du navigateur).
+    const activeTag = (document.activeElement && document.activeElement.tagName || "").toLowerCase();
+    const typing = activeTag === "input" || activeTag === "select" || activeTag === "textarea";
+    if((e.ctrlKey || e.metaKey) && (e.key === "z" || e.key === "Z") && !typing){
+      if(state.viewMode !== "images") return;
+      e.preventDefault();
+      if(undoLastReview()) afterReviewChange(groupsByKey[state.activeGroupKey]);
+      return;
+    }
+
     if(!lightboxOpen) return;
     // Ne jamais capturer les touches pendant la saisie d'une note ou d'une recherche.
-    const tag = (document.activeElement && document.activeElement.tagName || "").toLowerCase();
-    if(tag === "input" || tag === "select" || tag === "textarea") return;
+    const tag = activeTag;
+    if(typing) return;
 
     if(e.key === "ArrowLeft" || e.key === "ArrowRight"){
       e.preventDefault();
@@ -3612,10 +4142,50 @@ const LOCAL_LANGS = [
     if(!g) return;
     setReviewNote(g.key, this.value);
     renderReviewProgress();
+    renderBackupStatus();
   });
   document.getElementById("imageLightbox").addEventListener("mousemove", moveLoupe);
   document.getElementById("imageLightbox").addEventListener("mouseleave", hideLoupe);
   document.getElementById("reviewExportBtn").addEventListener("click", exportReviewCsv);
+  document.getElementById("reviewBackupBtn").addEventListener("click", backupReviewToFile);
+  document.getElementById("writeTokenSaveBtn").addEventListener("click", function(){
+    setWriteToken(document.getElementById("writeTokenInput").value.trim());
+    renderSyncStatus();
+    // Un jeton valide : on envoie tout de suite ce qui attendait dans ce navigateur.
+    if(getWriteToken()) pushServerReview();
+  });
+  document.getElementById("reviewRestoreBtn").addEventListener("click", async function(){
+    const input = document.getElementById("reviewRestoreFile");
+    const statusEl = document.getElementById("reviewBackupStatus");
+    if(!input.files || !input.files[0]){
+      statusEl.className = "source-status err";
+      statusEl.textContent = "Choisissez d'abord le fichier de sauvegarde à restaurer.";
+      return;
+    }
+    try{
+      const res = restoreReviewFromPayload(JSON.parse(await readFileAsText(input.files[0])));
+      if(state.viewMode === "images") refreshImagesView();
+      const g = groupsByKey[state.activeGroupKey];
+      if(g && !document.getElementById("imageLightbox").hidden) renderReviewControls(g);
+      statusEl.className = "source-status ok";
+      statusEl.textContent = "Restauré : " + res.added + " carte(s) ajoutée(s), " + res.updated +
+        " mise(s) à jour, " + res.kept + " conservée(s) (votre version était plus récente)" +
+        (res.project ? " — sauvegarde du projet « " + res.project + " »." : ".");
+    } catch(err){
+      console.error("[relecture]", err);
+      statusEl.className = "source-status err";
+      statusEl.textContent = "Échec : " + err.message;
+    }
+  });
+  document.getElementById("projectForgetBtn").addEventListener("click", function(){
+    if(!readStoredProject()){
+      setStatus("Aucun fichier n'est mémorisé pour cette campagne.", "err");
+      return;
+    }
+    if(!window.confirm("Oublier le project.json mémorisé pour cette campagne ? Votre avancement de relecture est conservé.")) return;
+    forgetStoredProject();
+    setStatus("Fichier oublié. Au prochain rechargement, le site repartira de ses propres fichiers.", "ok");
+  });
   document.getElementById("reviewResetBtn").addEventListener("click", function(){
     if(!window.confirm("Effacer tous les statuts et notes de relecture de cette campagne ?")) return;
     reviewData = {};
@@ -3623,6 +4193,8 @@ const LOCAL_LANGS = [
     const statusEl = document.getElementById("reviewStatus");
     statusEl.className = "source-status";
     statusEl.textContent = "Relecture réinitialisée pour cette campagne.";
+    try{ localStorage.removeItem(reviewBackupTimeKey()); } catch(e){}
+    renderBackupStatus();
     if(state.viewMode === "images") refreshImagesView();
     const g = groupsByKey[state.activeGroupKey];
     if(g && !document.getElementById("imageLightbox").hidden) renderReviewControls(g);
@@ -3639,30 +4211,53 @@ const LOCAL_LANGS = [
     loadFromLocal();
   });
 
-  function init(){
-    let initialSource = null;
-    try{
-      const url = new URL(window.location.href);
-      initialSource = url.searchParams.get("source");
-    } catch(e){}
-    if(!initialSource){
-      try{ initialSource = localStorage.getItem("dm_source"); } catch(e){}
-    }
-
-    if(initialSource){
-      document.getElementById("sourceInput").value = initialSource;
-      document.getElementById("sourceBody").hidden = false;
-      loadFromGithub(initialSource);
-    } else {
-      loadFromLocal();
-    }
-
+  async function init(){
+    // La campagne est déterminée EN PREMIER : c'est elle qui décide quel project.json
+    // mémorisé, quelle clé API et quel avancement de relecture recharger.
     let savedCampaign = "cyclopean";
     try{ savedCampaign = localStorage.getItem("dm_drive_campaign") || "cyclopean"; } catch(e){}
     document.getElementById("driveCampaignSelect").value = savedCampaign;
     applyCampaignPreset();
     document.getElementById("driveSourceModeLabel").textContent =
       CAMPAIGN_PRESETS[savedCampaign] ? CAMPAIGN_PRESETS[savedCampaign].label : "Personnalisé";
+
+    // Le site est-il servi par le Worker ? Si oui, campagnes et clé API viennent de lui.
+    if(await detectServer()){
+      applyServerCampaigns();
+      if(savedCampaign && SERVER.byKey[savedCampaign]) document.getElementById("driveCampaignSelect").value = savedCampaign;
+      const active = campaignKey();
+      document.getElementById("driveSourceModeLabel").textContent =
+        SERVER.byKey[active] ? SERVER.byKey[active].label : "Personnalisé";
+      document.getElementById("writeTokenRow").hidden = !SERVER.writeConfigured;
+      const tok = getWriteToken();
+      if(tok) document.getElementById("writeTokenInput").value = tok;
+    }
+
+    // Priorité des sources : une adresse ?source= explicite, puis le fichier importé
+    // mémorisé pour cette campagne, puis le dépôt GitHub mémorisé, puis les fichiers du site.
+    let urlSource = null;
+    try{
+      urlSource = new URL(window.location.href).searchParams.get("source");
+    } catch(e){}
+
+    if(urlSource){
+      document.getElementById("sourceInput").value = urlSource;
+      document.getElementById("sourceBody").hidden = false;
+      loadFromGithub(urlSource);
+    } else if(applyStoredProject(readStoredProject())){
+      // rien de plus à faire : le fichier importé la dernière fois a été rejoué
+    } else {
+      let githubSource = null;
+      try{ githubSource = localStorage.getItem("dm_source"); } catch(e){}
+      if(githubSource){
+        document.getElementById("sourceInput").value = githubSource;
+        document.getElementById("sourceBody").hidden = false;
+        loadFromGithub(githubSource);
+      } else {
+        loadFromLocal();
+      }
+    }
+
     // Charge (et lance si une clé API est mémorisée) les réglages propres à cette campagne
     // uniquement — jamais ceux d'une autre campagne/projet utilisé sur ce même site.
     loadCampaignScopedState(true);
