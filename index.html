@@ -453,11 +453,51 @@
     font-size: 10.5px;
     color: var(--text-faint);
   }
-  .card-item .dot.rev-ok{ background: var(--good); box-shadow: 0 0 0 2px var(--good-soft); }
-  .card-item .dot.rev-flag{ background: var(--miss); box-shadow: 0 0 0 2px var(--miss-soft); }
+  /* Marqueur de statut dans la liste. On n'utilise PAS la pastille `.dot` de l'onglet
+     Traductions : elle est verte par défaut, donc un « vert = relue » s'y noyait
+     complètement — toutes les cartes avaient l'air relues. */
+  .rev-mark{
+    width: 16px;
+    height: 16px;
+    flex-shrink: 0;
+    border-radius: 50%;
+    border: 1px solid var(--border-strong);
+    background: transparent;
+    color: transparent;
+    font-size: 10px;
+    line-height: 1;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .rev-mark.is-ok{ background: var(--good); border-color: var(--good); color: #10231a; }
+  .rev-mark.is-flag{ background: var(--miss); border-color: var(--miss); color: #2a1212; }
   .card-item .typo-mark{ color: var(--amber); margin-left: 4px; font-size: 11px; }
-  .image-tile.rev-ok{ outline: 2px solid var(--good); }
-  .image-tile.rev-flag{ outline: 2px solid var(--miss); }
+
+  /* Pastille sur la vignette : lisible d'un coup d'œil dans une grille de 300 cartes. */
+  .tile-badge{
+    position: absolute;
+    top: 8px;
+    left: 8px;
+    width: 26px;
+    height: 26px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 14px;
+    line-height: 1;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.55);
+    z-index: 2;
+  }
+  .tile-badge.is-ok{ background: var(--good); color: #10231a; }
+  .tile-badge.is-flag{ background: var(--miss); color: #2a1212; }
+  .image-tile.rev-ok{ border-color: var(--good); }
+  .image-tile.rev-flag{ border-color: var(--miss); }
+  /* Les cartes déjà validées reculent d'un cran : ce qui reste à faire saute aux yeux.
+     Les cartes signalées, elles, gardent tout leur contraste — elles réclament une action. */
+  .image-tile.rev-ok .image-tile-img-wrap img{ opacity: 0.55; }
+  .image-tile.rev-ok:hover .image-tile-img-wrap img{ opacity: 1; }
 
   .review-badge{
     font-family: "IBM Plex Mono", monospace;
@@ -2430,10 +2470,25 @@ const LOCAL_LANGS = [
     sel.hidden = false;
   }
 
+  // Le filtre affiche le compte de chaque catégorie : on voit ce qu'il reste à faire sans
+  // avoir à l'ouvrir, et on comprend d'emblée à quoi il sert.
   function populateImagesStatusFilter(){
     const sel = document.getElementById("imagesStatusFilter");
     sel.hidden = !cardGroups.length;
-    if(sel.value !== state.imagesStatusFilter) sel.value = state.imagesStatusFilter;
+    if(!cardGroups.length) return;
+    const s = reviewStats();
+    const todo = s.total - s.ok;
+    const opts = [
+      ["", "Toutes les cartes (" + s.total + ")"],
+      ["todo", "Non relues (" + todo + ")"],
+      ["ok", "Relues ✓ (" + s.ok + ")"],
+      ["flag", "À corriger ⚠ (" + s.flag + ")"],
+      ["typo", "Alerte typographique (" + s.typo + ")"]
+    ];
+    sel.innerHTML = opts.map(function(o){
+      return '<option value="' + o[0] + '">' + escapeHtml(o[1]) + '</option>';
+    }).join("");
+    sel.value = state.imagesStatusFilter;
   }
 
   /* ---------------- Boutons de relecture + note ---------------- */
@@ -2460,6 +2515,7 @@ const LOCAL_LANGS = [
     if(!g) return;
     setReviewStatus(g.key, status);
     renderReviewControls(g);
+    populateImagesStatusFilter(); // les compteurs du filtre suivent immédiatement
     buildImagesList();
     renderImagesGallery();
   }
@@ -2597,13 +2653,17 @@ const LOCAL_LANGS = [
         ? '<span class="img-num">#' + escapeHtml(g.number) + (g.back ? " · recto/verso" : "") + '</span>'
         : '<span class="img-num img-num-none">numéro non détecté</span>';
       const rev = getReview(g.key);
-      const revCls = rev && rev.status === "ok" ? " rev-ok" : (rev && rev.status === "flag" ? " rev-flag" : "");
+      const status = rev ? rev.status : null;
+      const revCls = status === "ok" ? " rev-ok" : (status === "flag" ? " rev-flag" : "");
+      const tileBadge = status === "ok"
+        ? '<span class="tile-badge is-ok" title="Relue">✓</span>'
+        : (status === "flag" ? '<span class="tile-badge is-flag" title="À corriger">⚠</span>' : "");
       const activeCls = g.key === state.activeGroupKey ? " active" : "";
       const rot = getRotation(f.id);
       const rotStyle = rot ? ' style="transform:rotate(' + rot + 'deg)"' : '';
       const typo = typoIssuesForCard(g.card) ? ' <span class="typo-mark" title="Alerte typographique">⚠</span>' : "";
       html += '<div class="image-tile' + activeCls + revCls + '" id="img-tile-' + escapeHtml(g.key) + '" data-group="' + escapeHtml(g.key) + '" role="button" tabindex="0">' +
-        '<div class="image-tile-img-wrap">' +
+        '<div class="image-tile-img-wrap">' + tileBadge +
         '<img src="' + driveImageUrl(f.id, 400) + '" data-file="' + escapeHtml(f.id) + '" alt="' + escapeHtml(f.name) + '" loading="lazy"' + rotStyle + '>' +
         '<button type="button" class="rotate-btn rotate-btn-tile" data-rotate-id="' + escapeHtml(f.id) + '" title="Pivoter de 90°" aria-label="Pivoter l\'image de 90°">⟳</button>' +
         '</div>' +
@@ -2855,11 +2915,15 @@ const LOCAL_LANGS = [
       cardsEl.className = "set-cards";
       sec.items.forEach(function(g){
         const rev = getReview(g.key);
-        const dotCls = rev && rev.status === "ok" ? " rev-ok" : (rev && rev.status === "flag" ? " rev-flag" : "");
+        const status = rev ? rev.status : null;
+        const markCls = status === "ok" ? " is-ok" : (status === "flag" ? " is-flag" : "");
+        const markGlyph = status === "ok" ? "✓" : (status === "flag" ? "⚠" : "");
+        const markTitle = status === "ok" ? "Relue" : (status === "flag" ? "À corriger" : "Non relue");
         const item = document.createElement("button");
         item.className = "card-item" + (g.key === state.activeGroupKey ? " active" : "");
         item.dataset.group = g.key;
-        item.innerHTML = '<span class="dot' + dotCls + '"></span><span class="cname">' +
+        item.innerHTML = '<span class="rev-mark' + markCls + '" title="' + markTitle + '">' + markGlyph + '</span>' +
+          '<span class="cname">' +
           escapeHtml(groupLabel(g)) +
           (typoIssuesForCard(g.card) ? '<span class="typo-mark" title="Alerte typographique">⚠</span>' : "") +
           '</span>';
