@@ -406,6 +406,25 @@
     top: 10px;
     right: 10px;
   }
+  .lightbox-img-wrap.compare-broken{
+    min-width: 180px;
+    min-height: 240px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(255,255,255,0.05);
+    border-radius: 10px;
+  }
+  .lightbox-compare-error{
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 11px;
+    line-height: 1.5;
+    color: #f2c185;
+    max-width: 240px;
+    text-align: center;
+    margin: 0;
+    padding: 0 12px;
+  }
   .lightbox-caption{
     display: flex;
     align-items: center;
@@ -952,8 +971,9 @@
       </div>
     </div>
     <div class="lightbox-media" id="lightboxCompareMedia" hidden>
-      <div class="lightbox-img-wrap">
+      <div class="lightbox-img-wrap" id="lightboxCompareImgWrap">
         <img id="lightboxCompareImg" src="" alt="">
+        <p class="lightbox-compare-error" id="lightboxCompareError" hidden>Image indisponible — vérifiez que le dossier Shoggoth est bien partagé en lecture (« Tous les utilisateurs disposant du lien »), comme le dossier de scans.</p>
       </div>
       <div class="lightbox-caption">
         <span>Version finale (Shoggoth)</span>
@@ -1879,22 +1899,42 @@ const LOCAL_LANGS = [
     document.getElementById("lightboxImg").src = "";
     document.getElementById("lightboxCompareImg").src = "";
     document.getElementById("lightboxCompareMedia").hidden = true;
+    document.getElementById("lightboxCompareImgWrap").classList.remove("compare-broken");
+    document.getElementById("lightboxCompareError").hidden = true;
     currentLightboxFileId = null;
   }
 
   // Affiche, à côté du scan, l'image finale Shoggoth correspondant à la même carte et à la
   // même face (si un dossier d'images finales est chargé et qu'une correspondance existe) —
   // pour comparer les deux directement, sans avoir à ouvrir Drive dans un autre onglet.
+  // Si la vignette Google Drive ne charge pas (dossier non partagé publiquement, id invalide),
+  // un message explicite remplace l'image cassée plutôt que de laisser un espace vide/étrange.
   function renderLightboxCompare(f, card){
     const media = document.getElementById("lightboxCompareMedia");
+    const wrap = document.getElementById("lightboxCompareImgWrap");
+    const img = document.getElementById("lightboxCompareImg");
+    const errorEl = document.getElementById("lightboxCompareError");
     const shoggothFile = card ? findShoggothFileForCard(card.id, f.side) : null;
+    wrap.classList.remove("compare-broken");
+    errorEl.hidden = true;
     if(!shoggothFile){
       media.hidden = true;
-      document.getElementById("lightboxCompareImg").src = "";
+      img.src = "";
+      img.hidden = false;
       return;
     }
     media.hidden = false;
-    const img = document.getElementById("lightboxCompareImg");
+    img.hidden = false;
+    img.onerror = function(){
+      img.hidden = true;
+      wrap.classList.add("compare-broken");
+      errorEl.hidden = false;
+    };
+    img.onload = function(){
+      img.hidden = false;
+      wrap.classList.remove("compare-broken");
+      errorEl.hidden = true;
+    };
     img.src = driveImageUrl(shoggothFile.id, 1600);
     img.alt = shoggothFile.name;
     document.getElementById("lightboxCompareOpenOriginal").href =
