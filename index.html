@@ -333,17 +333,33 @@
     z-index: 100;
     background: rgba(0,0,0,0.82);
     display: flex;
-    flex-direction: column;
     align-items: center;
     justify-content: center;
-    gap: 14px;
     padding: 40px 20px;
     cursor: zoom-out;
+    overflow: auto;
   }
   .lightbox[hidden]{ display: none; }
+  .lightbox-body{
+    display: flex;
+    align-items: flex-start;
+    justify-content: center;
+    gap: 24px;
+    max-width: 1400px;
+    width: 100%;
+    cursor: default;
+  }
+  .lightbox-media{
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 14px;
+    flex: 1 1 auto;
+    min-width: 0;
+  }
   .lightbox img{
-    max-width: min(92vw, 1100px);
-    max-height: 78vh;
+    max-width: min(60vw, 800px);
+    max-height: 82vh;
     width: auto;
     height: auto;
     border-radius: 10px;
@@ -371,8 +387,64 @@
     color: #fff;
     cursor: pointer;
     padding: 6px 10px;
+    z-index: 101;
   }
   .lightbox-close:hover{ color: var(--amber, #e0a94e); }
+
+  .lightbox-text{
+    flex: 1 1 380px;
+    max-width: 440px;
+    max-height: 86vh;
+    overflow-y: auto;
+    background: var(--surface);
+    border-radius: 12px;
+    padding: 18px 20px 22px;
+    box-shadow: 0 12px 40px rgba(0,0,0,0.5);
+  }
+  .lightbox-text-head{
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    flex-wrap: wrap;
+    margin-bottom: 10px;
+  }
+  .lightbox-text-head h3{
+    font-family: "Fraunces", Georgia, serif;
+    font-size: 19px;
+    margin: 0;
+    color: var(--text);
+  }
+  .lightbox-flip-btn{
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 11px;
+    padding: 6px 10px;
+    border-radius: 7px;
+    border: 1px solid var(--border-strong);
+    background: var(--surface-alt);
+    color: var(--text-dim);
+    cursor: pointer;
+    white-space: nowrap;
+  }
+  .lightbox-flip-btn:hover{ color: var(--text); border-color: var(--accent); }
+  .lightbox-flip-btn.active{
+    background: var(--accent);
+    border-color: var(--accent);
+    color: var(--accent-contrast);
+  }
+  .lightbox-text-source{
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 10px;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    color: var(--text-faint);
+    margin: 0 0 12px;
+  }
+  @media (max-width: 900px){
+    .lightbox-body{ flex-direction: column; align-items: center; }
+    .lightbox img{ max-width: min(88vw, 800px); max-height: 50vh; }
+    .lightbox-text{ max-width: min(88vw, 800px); width: 100%; max-height: none; }
+  }
 
   .filter-row{
     display: flex;
@@ -799,6 +871,15 @@
           <button type="button" id="driveLoadBtn">Charger les images</button>
         </div>
         <p class="source-status" id="driveStatus">Voir le README pour créer la clé API (gratuit, 2 min).</p>
+
+        <label class="source-label" style="margin-top:14px">Texte d'origine à comparer (optionnel)</label>
+        <input class="search-input" id="origTextUrl" type="text" autocomplete="off" placeholder="Lien GitHub/direct vers un JSON">
+        <p class="source-body-or">— ou —</p>
+        <input class="file-input" id="origTextFile" type="file" accept="application/json,.json">
+        <div class="source-actions" style="margin-top:6px">
+          <button type="button" id="origTextLoadBtn">Charger le texte d'origine</button>
+        </div>
+        <p class="source-status" id="origTextStatus">Un second JSON (même format) pour comparer le texte actuel avec une autre version — le bouton « Voir le texte d'origine » apparaît dans l'agrandissement d'une image une fois chargé.</p>
       </div>
     </div>
 
@@ -825,10 +906,22 @@
 
 <div class="lightbox" id="imageLightbox" hidden>
   <button type="button" class="lightbox-close" id="lightboxClose" aria-label="Fermer">×</button>
-  <img id="lightboxImg" src="" alt="">
-  <div class="lightbox-caption">
-    <span id="lightboxCaption"></span>
-    <a id="lightboxOpenOriginal" href="#" target="_blank" rel="noopener">Ouvrir sur Drive ↗</a>
+  <div class="lightbox-body">
+    <div class="lightbox-media">
+      <img id="lightboxImg" src="" alt="">
+      <div class="lightbox-caption">
+        <span id="lightboxCaption"></span>
+        <a id="lightboxOpenOriginal" href="#" target="_blank" rel="noopener">Ouvrir sur Drive ↗</a>
+      </div>
+    </div>
+    <div class="lightbox-text" id="lightboxTextPanel" hidden>
+      <div class="lightbox-text-head">
+        <h3 id="lightboxCardName"></h3>
+        <button type="button" class="lightbox-flip-btn" id="lightboxFlipBtn" hidden>⇄ Texte d'origine</button>
+      </div>
+      <p class="lightbox-text-source" id="lightboxTextSource"></p>
+      <div id="lightboxTextBody"></div>
+    </div>
   </div>
 </div>
 
@@ -1385,6 +1478,28 @@ const LOCAL_LANGS = [
      import + un classement. */
 
   let driveFiles = []; // [{ id, name, number, side }] trié par numéro puis nom
+  let ORIG_TEXT_BY_NUMBER = {}; // project_number (string) -> carte { front, back, name, ... } venant d'un 2e JSON optionnel
+  let currentLightboxFileId = null;
+  let lightboxShowingOrig = false;
+
+  function buildLookupByProjectNumber(container){
+    const byNum = {};
+    const arr = Array.isArray(container) ? container : Object.values(container || {});
+    arr.forEach(function(c){
+      if(!c || typeof c !== "object") return;
+      const n = c.project_number;
+      if(n === undefined || n === null || n === "") return;
+      byNum[String(n)] = c;
+    });
+    return byNum;
+  }
+
+  function effectiveFace(card, faceKey, langCode){
+    const orig = card[faceKey] || {};
+    if(!langCode) return orig;
+    const t = (card.translations[langCode] || {})[faceKey] || {};
+    return hasContent(t) ? t : orig;
+  }
 
   function parseGoogleDriveFolderId(input){
     const s = (input || "").trim();
@@ -1498,17 +1613,93 @@ const LOCAL_LANGS = [
   function openLightbox(id){
     const f = driveFiles.find(function(x){ return x.id === id; });
     if(!f) return;
+    currentLightboxFileId = id;
+    lightboxShowingOrig = false;
     document.getElementById("lightboxImg").src = driveImageUrl(f.id, 1600);
     document.getElementById("lightboxImg").alt = f.name;
     document.getElementById("lightboxCaption").textContent = imageLabel(f);
     document.getElementById("lightboxOpenOriginal").href = "https://drive.google.com/file/d/" + encodeURIComponent(f.id) + "/view";
     document.getElementById("imageLightbox").hidden = false;
+    renderLightboxText();
   }
 
   function closeLightbox(){
     const box = document.getElementById("imageLightbox");
     box.hidden = true;
     document.getElementById("lightboxImg").src = "";
+    currentLightboxFileId = null;
+    lightboxShowingOrig = false;
+  }
+
+  // Cherche la carte correspondant à l'image ouverte (par numéro détecté dans le nom
+  // de fichier Drive == project_number de la carte) et affiche son texte à côté de
+  // l'image — avec un bouton pour basculer vers un second JSON "texte d'origine" si
+  // l'utilisateur en a chargé un.
+  function renderLightboxText(){
+    const panel = document.getElementById("lightboxTextPanel");
+    const flipBtn = document.getElementById("lightboxFlipBtn");
+    if(!currentLightboxFileId){ panel.hidden = true; return; }
+
+    const f = driveFiles.find(function(x){ return x.id === currentLightboxFileId; });
+    if(!f || !f.number){
+      panel.hidden = true;
+      return;
+    }
+
+    const card = CARD_DATA.cards.find(function(c){ return String(c.project_number) === f.number; });
+    const origCard = ORIG_TEXT_BY_NUMBER[f.number];
+
+    panel.hidden = false;
+
+    if(!card && !origCard){
+      document.getElementById("lightboxCardName").textContent = "Carte introuvable";
+      document.getElementById("lightboxTextSource").textContent =
+        "Numéro #" + f.number + " — aucune carte avec ce project_number dans les données chargées (onglet Traductions et/ou texte d'origine).";
+      document.getElementById("lightboxTextBody").innerHTML = "";
+      flipBtn.hidden = true;
+      return;
+    }
+
+    flipBtn.hidden = !(card && origCard); // le flip n'a de sens que si les deux existent
+    flipBtn.classList.toggle("active", lightboxShowingOrig);
+    flipBtn.textContent = lightboxShowingOrig ? "⇄ Texte actuel" : "⇄ Texte d'origine";
+
+    const showOrig = lightboxShowingOrig && origCard;
+    const sourceCard = showOrig ? origCard : card;
+
+    document.getElementById("lightboxCardName").textContent = (sourceCard && sourceCard.name) || f.name;
+
+    let sourceLabel;
+    if(showOrig){
+      sourceLabel = "Texte d'origine (2e JSON chargé)";
+    } else if(!card){
+      sourceLabel = "Aucune carte « actuelle » — seul le texte d'origine est disponible";
+    } else if(LANGS.length > 0){
+      const L = LANG_BY_CODE[state.lang] || LANGS[0];
+      sourceLabel = "Texte actuel — " + (L ? L.label : "original");
+    } else {
+      sourceLabel = "Texte actuel (original, aucune traduction chargée)";
+    }
+    document.getElementById("lightboxTextSource").textContent = sourceLabel;
+
+    let bodyHtml = "";
+    const faces = [["front","avant"], ["back","arrière"]];
+    if(showOrig){
+      faces.forEach(function(pair){
+        const faceData = sourceCard[pair[0]] || {};
+        if(!hasContent(faceData)) return;
+        bodyHtml += '<p class="side-face-label" style="margin-top:14px">Face ' + pair[1] + '</p>' + renderSide(faceData);
+      });
+    } else if(card){
+      const langCode = LANGS.length > 0 ? (state.lang || LANGS[0].code) : null;
+      faces.forEach(function(pair){
+        const eff = effectiveFace(card, pair[0], langCode);
+        if(!hasContent(eff)) return;
+        bodyHtml += '<p class="side-face-label" style="margin-top:14px">Face ' + pair[1] + '</p>' + renderSide(eff);
+      });
+    }
+    if(!bodyHtml) bodyHtml = '<p class="field-empty">Aucun texte disponible pour cette carte.</p>';
+    document.getElementById("lightboxTextBody").innerHTML = bodyHtml;
   }
 
   function buildImagesList(){
@@ -2078,6 +2269,44 @@ const LOCAL_LANGS = [
     });
   });
 
+  // Second JSON optionnel : texte "d'origine" à comparer avec le texte actuel,
+  // indexé par project_number (même clé que pour matcher les images Drive).
+  async function runOrigTextLoad(){
+    const statusEl = document.getElementById("origTextStatus");
+    statusEl.className = "source-status";
+    statusEl.textContent = "Chargement du texte d'origine…";
+    try{
+      const data = await loadHistorySlot(
+        document.getElementById("origTextFile"),
+        document.getElementById("origTextUrl"),
+        "Texte d'origine"
+      );
+      ORIG_TEXT_BY_NUMBER = buildLookupByProjectNumber(data.cards);
+      const n = Object.keys(ORIG_TEXT_BY_NUMBER).length;
+      statusEl.className = "source-status " + (n > 0 ? "ok" : "err");
+      statusEl.textContent = n > 0
+        ? n + " carte(s) indexée(s) par numéro — le bouton « Texte d'origine » apparaît dans l'agrandissement d'une image quand ça matche."
+        : "Aucune carte avec un project_number trouvée dans ce fichier.";
+      try{
+        const urlVal = document.getElementById("origTextUrl").value.trim();
+        if(urlVal) localStorage.setItem("dm_origtext_url", urlVal);
+      } catch(e){}
+      if(!document.getElementById("imageLightbox").hidden) renderLightboxText();
+    } catch(err){
+      console.error("[origtext]", err);
+      statusEl.className = "source-status err";
+      statusEl.textContent = "Échec : " + err.message;
+    }
+  }
+  document.getElementById("origTextLoadBtn").addEventListener("click", runOrigTextLoad);
+  document.getElementById("origTextUrl").addEventListener("keydown", function(e){
+    if(e.key === "Enter") runOrigTextLoad();
+  });
+  document.getElementById("lightboxFlipBtn").addEventListener("click", function(){
+    lightboxShowingOrig = !lightboxShowingOrig;
+    renderLightboxText();
+  });
+
   // Clic sur une vignette de la galerie → agrandissement (lightbox), sans quitter la page.
   document.getElementById("main").addEventListener("click", function(e){
     const tile = e.target.closest(".image-tile[data-id]");
@@ -2085,7 +2314,7 @@ const LOCAL_LANGS = [
   });
   document.getElementById("lightboxClose").addEventListener("click", closeLightbox);
   document.getElementById("imageLightbox").addEventListener("click", function(e){
-    if(e.target.id === "imageLightbox") closeLightbox();
+    if(e.target.id === "imageLightbox" || e.target.classList.contains("lightbox-body")) closeLightbox();
   });
   document.addEventListener("keydown", function(e){
     if(e.key === "Escape" && !document.getElementById("imageLightbox").hidden) closeLightbox();
@@ -2129,6 +2358,13 @@ const LOCAL_LANGS = [
       document.getElementById("driveFolderInput").value = savedDriveFolder;
       document.getElementById("driveApiKeyInput").value = savedDriveKey;
       runDriveLoad();
+    }
+
+    let savedOrigTextUrl = null;
+    try{ savedOrigTextUrl = localStorage.getItem("dm_origtext_url"); } catch(e){}
+    if(savedOrigTextUrl){
+      document.getElementById("origTextUrl").value = savedOrigTextUrl;
+      runOrigTextLoad();
     }
   }
 
