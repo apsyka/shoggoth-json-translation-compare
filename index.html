@@ -421,6 +421,20 @@
     background: rgba(255,255,255,0.05);
     border-radius: 10px;
   }
+  .mismatch-banner{
+    margin: 0 0 18px;
+    padding: 12px 16px;
+    border: 1px solid var(--miss);
+    border-left-width: 4px;
+    border-radius: 8px;
+    background: var(--miss-soft);
+    color: var(--text);
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 12px;
+    line-height: 1.6;
+  }
+  .mismatch-banner strong{ color: var(--miss); }
+  .mismatch-banner em{ color: var(--amber); font-style: normal; }
   .lightbox-compare-error{
     font-family: "IBM Plex Mono", monospace;
     font-size: 11px;
@@ -1856,10 +1870,16 @@ const LOCAL_LANGS = [
   function classifyShoggothFilename(name){
     const m = (name || "").match(UUID_RE);
     if(!m) return null;
-    const rest = name.slice(m[0].length);
+    // La face est cherchée comme MOT ENTIER, en repartant de la fin du nom (le gabarit
+    // Shoggoth se termine par "…_front_1.png" / "…_back_2.png"). Chercher "front" n'importe
+    // où dans la chaîne ferait passer une carte nommée « Confrontation » pour un recto.
+    const base = name.slice(m[0].length).replace(/\.[a-zA-Z0-9]+$/, "");
+    const tokens = base.toLowerCase().split(/[^a-z0-9]+/).filter(Boolean);
     let side = null;
-    if(/front/i.test(rest)) side = "front";
-    else if(/back/i.test(rest)) side = "back";
+    for(let i = tokens.length - 1; i >= 0; i--){
+      if(tokens[i] === "front" || tokens[i] === "recto"){ side = "front"; break; }
+      if(tokens[i] === "back" || tokens[i] === "verso"){ side = "back"; break; }
+    }
     return { cardId: m[1], side: side };
   }
 
@@ -1889,6 +1909,56 @@ const LOCAL_LANGS = [
       if(exact) return exact;
     }
     return matches[0];
+  }
+
+  // Combien d'images Drive retrouvent une carte dans le project.json chargé ? Sert à
+  // détecter le cas le plus fréquent (et le plus déroutant) : les images d'une campagne
+  // affichées alors que le project.json chargé est celui d'un AUTRE projet — les numéros
+  // tombent alors dans le vide (ou pire, sur des cartes sans rapport).
+  function imagesMatchStats(){
+    let matched = 0;
+    driveFiles.forEach(function(f){ if(findCardByDriveNumber(f)) matched++; });
+    return { total: driveFiles.length, matched: matched };
+  }
+
+  // Combien d'images finales Shoggoth retrouvent leur carte ? C'est le signal le plus fiable
+  // pour détecter un mauvais project.json : ces noms de fichiers portent l'identifiant EXACT
+  // de la carte, donc zéro correspondance = ce n'est pas le project.json de cette campagne.
+  // (Le simple taux de numéros appariés ne suffit pas : deux campagnes numérotées 1..n voient
+  // la plupart de leurs numéros « correspondre » par pure coïncidence, sur de mauvaises cartes.)
+  function shoggothMatchStats(){
+    if(!shoggothFiles.length) return null;
+    const known = {};
+    CARD_DATA.cards.forEach(function(c){ known[c.id] = true; });
+    const matched = shoggothFiles.filter(function(f){ return known[f.cardId]; }).length;
+    return { total: shoggothFiles.length, matched: matched };
+  }
+
+  function projectMismatchBannerHtml(){
+    if(!driveFiles.length) return "";
+    const stats = imagesMatchStats();
+    if(stats.total === 0) return "";
+
+    let reason = "";
+    const sh = shoggothMatchStats();
+    if(sh && sh.matched === 0){
+      reason = "Aucune des " + sh.total + " images finales Shoggoth ne retrouve sa carte " +
+               "(la correspondance se fait sur l'identifiant de carte, qui ne trompe pas).";
+    } else if(stats.matched / stats.total < 0.5){
+      reason = "Seulement " + stats.matched + " image(s) sur " + stats.total +
+               " retrouvent une carte par leur numéro.";
+    }
+    if(!reason) return "";
+
+    const projectLabel = CARD_DATA.project_name
+      ? " Le project.json actuellement chargé est « " + escapeHtml(CARD_DATA.project_name) + " »."
+      : "";
+    return '<div class="mismatch-banner">' +
+      '<strong>Le project.json chargé ne correspond pas à ces images.</strong> ' + reason + projectLabel +
+      ' Chargez celui de la même campagne que ces scans : onglet <em>Traductions</em> → ' +
+      '« ⚙ Source des données » → <em>Fichiers JSON depuis mon ordinateur</em>. ' +
+      'Sans ça, ni le texte ni la comparaison avec les images finales ne peuvent fonctionner.' +
+      '</div>';
   }
 
   function imageMatchesFilter(f, q){
@@ -1932,12 +2002,20 @@ const LOCAL_LANGS = [
     const filtered = driveFiles.filter(function(f){ return imageMatchesFilter(f, q) && imagePassesSetFilter(f); });
 
     if(!filtered.length){
-      main.innerHTML = '<p class="empty-msg">Aucune image ne correspond à la recherche / au filtre.</p>';
+      main.innerHTML = projectMismatchBannerHtml() +
+        '<p class="empty-msg">Aucune image ne correspond à la recherche / au filtre.</p>';
       return;
     }
 
-    let html = '<div class="topbar"><div><p class="breadcrumb">Google Drive</p>' +
+    // Le project.json utilisé pour le texte est rappelé en permanence ici : c'est lui qui
+    // décide de tout (texte, sets de rencontre, images finales), et se tromper de projet est
+    // l'erreur la plus facile à faire quand un même site sert à plusieurs campagnes.
+    const projectHint = CARD_DATA.project_name
+      ? ' · texte issu de « ' + escapeHtml(CARD_DATA.project_name) + ' »'
+      : "";
+    let html = '<div class="topbar"><div><p class="breadcrumb">Google Drive' + projectHint + '</p>' +
       '<h2 class="card-title">Images importées</h2></div></div>';
+    html += projectMismatchBannerHtml();
     html += '<div class="image-grid">';
     filtered.forEach(function(f){
       const badge = f.number
@@ -2044,7 +2122,9 @@ const LOCAL_LANGS = [
       panel.hidden = false;
       document.getElementById("lightboxCardName").textContent = "Carte introuvable";
       document.getElementById("lightboxTextSource").textContent = f.number
-        ? "Numéro #" + f.number + " — aucune carte avec ce project_number dans le project.json chargé dans l'onglet Traductions."
+        ? "Numéro #" + f.number + " — aucune carte avec ce project_number dans le project.json chargé"
+          + (CARD_DATA.project_name ? " (« " + CARD_DATA.project_name + " »)" : "")
+          + ". Chargez le project.json de la même campagne que ces images : onglet Traductions → Source des données → Fichiers JSON depuis mon ordinateur."
         : "Numéro non détecté dans le nom de fichier.";
       document.getElementById("lightboxTextBody").innerHTML = "";
       return;
