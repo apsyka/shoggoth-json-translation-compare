@@ -932,8 +932,9 @@
         <input class="file-input" id="origTextFile" type="file" accept="application/json,.json">
         <div class="source-actions" style="margin-top:6px">
           <button type="button" id="origTextLoadBtn">Charger le texte d'origine</button>
+          <button type="button" id="origTextClearBtn">Retirer</button>
         </div>
-        <p class="source-status" id="origTextStatus">Un second JSON (même format) pour comparer le texte actuel avec une autre version — le bouton « Voir le texte d'origine » apparaît dans l'agrandissement d'une image une fois chargé.</p>
+        <p class="source-status" id="origTextStatus">Un second JSON (même format) pour comparer le texte actuel avec une autre version — le bouton « Voir le texte d'origine » apparaît dans l'agrandissement d'une image une fois chargé. Optionnel : rien n'est chargé par défaut, et ce réglage est propre à la campagne sélectionnée ci-dessus.</p>
       </div>
     </div>
 
@@ -1580,6 +1581,24 @@ const LOCAL_LANGS = [
       folder: "https://drive.google.com/drive/folders/1i-zHJBqPsNXwtHgQoSjRdc1yu_3qSKJO"
     }
   };
+
+  // Tout ce qui est propre à une campagne (clé API, tableau de référence, texte d'origine)
+  // est mémorisé sous une clé de stockage séparée par campagne, pour qu'un réglage fait sur
+  // un projet (ex. "Dark Matter" en dossier personnalisé) ne se retrouve jamais appliqué,
+  // par erreur, à un autre projet (ex. "Cyclopean Foundations").
+  function campaignKey(){
+    try{ return document.getElementById("driveCampaignSelect").value || "cyclopean"; }
+    catch(e){ return "cyclopean"; }
+  }
+  function campaignScopedKey(base){ return base + "__" + campaignKey(); }
+
+  // Textes par défaut des zones de statut, capturés une fois au chargement de la page, pour
+  // pouvoir les remettre tels quels quand on change de campagne (au lieu de laisser un vieux
+  // message affiché pour la campagne précédente).
+  const DEFAULT_REF_SHEET_STATUS = document.getElementById("refSheetStatus").textContent;
+  const DEFAULT_ORIGTEXT_STATUS = document.getElementById("origTextStatus").textContent;
+  const DEFAULT_DRIVE_STATUS = document.getElementById("driveStatus").textContent;
+
   function applyCampaignPreset(){
     const sel = document.getElementById("driveCampaignSelect").value;
     const folderInput = document.getElementById("driveFolderInput");
@@ -1591,6 +1610,50 @@ const LOCAL_LANGS = [
       let savedCustom = "";
       try{ savedCustom = localStorage.getItem("dm_drive_folder_custom") || ""; } catch(e){}
       folderInput.value = savedCustom;
+    }
+  }
+
+  // Réinitialise puis recharge tous les réglages propres à la campagne actuellement
+  // sélectionnée (clé API, tableau de référence, texte d'origine), et vide les données déjà
+  // en mémoire pour l'ancienne campagne (images, correspondances, texte d'origine) — appelé
+  // au chargement de la page et à chaque changement de campagne.
+  function loadCampaignScopedState(autoLoad){
+    const camp = campaignKey();
+
+    driveFiles = [];
+    setReferenceRows([]);
+    ORIG_TEXT_BY_NUMBER = {};
+    currentLightboxFileId = null;
+    state.imagesSetFilter = "";
+
+    document.getElementById("driveStatus").className = "source-status";
+    document.getElementById("driveStatus").textContent = DEFAULT_DRIVE_STATUS;
+    document.getElementById("refSheetStatus").className = "source-status";
+    document.getElementById("refSheetStatus").textContent = DEFAULT_REF_SHEET_STATUS;
+    document.getElementById("origTextStatus").className = "source-status";
+    document.getElementById("origTextStatus").textContent = DEFAULT_ORIGTEXT_STATUS;
+    document.getElementById("refSheetFile").value = "";
+    document.getElementById("origTextFile").value = "";
+
+    let savedKey = "";
+    try{ savedKey = localStorage.getItem(campaignScopedKey("dm_drive_key")) || ""; } catch(e){}
+    document.getElementById("driveApiKeyInput").value = savedKey;
+
+    let savedRef = "";
+    try{ savedRef = localStorage.getItem(campaignScopedKey("dm_ref_sheet_url")) || ""; } catch(e){}
+    document.getElementById("refSheetUrl").value = savedRef;
+
+    let savedOrig = "";
+    try{ savedOrig = localStorage.getItem(campaignScopedKey("dm_origtext_url")) || ""; } catch(e){}
+    document.getElementById("origTextUrl").value = savedOrig;
+
+    if(state.viewMode === "images") refreshImagesView();
+    if(!document.getElementById("imageLightbox").hidden) renderLightboxText();
+
+    if(autoLoad){
+      if(savedKey && document.getElementById("driveFolderInput").value.trim()) runDriveLoad();
+      if(savedRef) runRefSheetLoad();
+      if(savedOrig) runOrigTextLoad();
     }
   }
 
@@ -1746,24 +1809,51 @@ const LOCAL_LANGS = [
     return card ? { card: card, refRow: refRow } : null;
   }
 
-  // Nom du set de rencontre (tel qu'écrit dans le tableau de référence) pour un fichier Drive,
-  // ou null si aucune correspondance.
-  function driveFileEncounterSet(f){
-    const refRow = findReferenceRowForFile(f);
-    return (refRow && refRow.esName) ? refRow.esName : null;
+  // Carte du JSON correspondant à un fichier Drive via le numéro détecté dans son nom ==
+  // project_number de la carte (méthode historique, utile quand la numérotation Drive est
+  // déjà fiable et qu'aucun tableau de référence n'est nécessaire).
+  function findCardByDriveNumber(f){
+    if(!f.number || !CARD_DATA.cards.length) return null;
+    return CARD_DATA.cards.find(function(c){ return String(c.project_number) === f.number; }) || null;
   }
 
-  // Liste des noms de sets de rencontre présents dans le tableau de référence, dans l'ordre
-  // d'apparition (= ordre officiel du scénario).
-  function getReferenceEncounterSetNames(){
+  // Nom du set de rencontre pour un fichier Drive : via le tableau de référence si un est
+  // chargé (nom de fichier -> ligne -> Encounter Set Name), sinon via le project_number déjà
+  // présent dans le project.json chargé (utile pour une campagne dont la numérotation est déjà
+  // à jour, sans avoir besoin de charger un tableau de référence en plus). Une seule méthode à
+  // la fois (jamais les deux mélangées) pour rester cohérent avec les noms de groupe proposés
+  // par getEncounterSetNamesForFilter — sinon un fichier pourrait se voir attribuer un set qui
+  // n'existe dans aucun des groupes affichés et disparaître silencieusement de la liste.
+  function driveFileEncounterSet(f){
+    if(REF_ROWS.length){
+      const refRow = findReferenceRowForFile(f);
+      return (refRow && refRow.esName) ? refRow.esName : null;
+    }
+    const card = findCardByDriveNumber(f);
+    return (card && card.encounter_set_name) ? card.encounter_set_name : null;
+  }
+
+  // Liste des noms de sets de rencontre à proposer dans le filtre, dans l'ordre officiel du
+  // scénario : ceux du tableau de référence s'il est chargé, sinon ceux déjà présents dans le
+  // project.json chargé (ordre d'apparition des cartes).
+  function getEncounterSetNamesForFilter(){
     const seen = new Set();
     const names = [];
-    REF_ROWS.forEach(function(row){
-      const name = row.esName || "";
-      if(!name || seen.has(name)) return;
-      seen.add(name);
-      names.push(name);
-    });
+    if(REF_ROWS.length){
+      REF_ROWS.forEach(function(row){
+        const name = row.esName || "";
+        if(!name || seen.has(name)) return;
+        seen.add(name);
+        names.push(name);
+      });
+    } else {
+      CARD_DATA.cards.forEach(function(card){
+        const name = card.encounter_set_name || "";
+        if(!name || seen.has(name)) return;
+        seen.add(name);
+        names.push(name);
+      });
+    }
     return names;
   }
 
@@ -1857,8 +1947,7 @@ const LOCAL_LANGS = [
     });
     driveFiles = files;
     try{
-      localStorage.setItem("dm_drive_folder", folderInputVal);
-      localStorage.setItem("dm_drive_key", apiKey);
+      localStorage.setItem(campaignScopedKey("dm_drive_key"), apiKey);
     } catch(e){}
     return { total: files.length, withNumber: files.filter(function(f){ return f.number; }).length };
   }
@@ -1875,11 +1964,11 @@ const LOCAL_LANGS = [
 
   function populateImagesSetFilter(){
     const sel = document.getElementById("imagesSetFilter");
-    if(!driveFiles.length || !REF_ROWS.length){
+    const names = getEncounterSetNamesForFilter();
+    if(!driveFiles.length || !names.length){
       sel.hidden = true;
       return;
     }
-    const names = getReferenceEncounterSetNames();
     const previous = state.imagesSetFilter;
     sel.innerHTML = '<option value="">Tous les sets de rencontre</option>' +
       names.map(function(n){ return '<option value="' + escapeHtml(n) + '">' + escapeHtml(n) + '</option>'; }).join("");
@@ -2061,13 +2150,15 @@ const LOCAL_LANGS = [
     }
 
     const passesBase = function(f){ return imageMatchesFilter(f, q) && imagePassesSetFilter(f); };
+    const setNames = getEncounterSetNamesForFilter();
 
     let groups;
-    if(REF_ROWS.length){
-      // Regroupement par set de rencontre (ordre officiel = ordre du tableau de référence),
-      // avec un groupe "Sans correspondance" pour les fichiers non reconnus par le tableau.
+    if(setNames.length){
+      // Regroupement par set de rencontre (ordre officiel : tableau de référence si chargé,
+      // sinon ordre des cartes du project.json), avec un groupe "Sans correspondance" pour
+      // les fichiers qu'aucune des deux méthodes ne parvient à rattacher à un set.
       groups = [];
-      getReferenceEncounterSetNames().forEach(function(setName){
+      setNames.forEach(function(setName){
         groups.push({
           key: "img-set-" + setName,
           name: setName,
@@ -2646,6 +2737,9 @@ const LOCAL_LANGS = [
   document.getElementById("driveCampaignSelect").addEventListener("change", function(){
     try{ localStorage.setItem("dm_drive_campaign", this.value); } catch(e){}
     applyCampaignPreset();
+    // Chaque campagne a ses propres réglages (clé API, tableau de référence, texte
+    // d'origine) : on les recharge ici pour ne jamais mélanger deux projets.
+    loadCampaignScopedState(true);
   });
   document.getElementById("imagesSetFilter").addEventListener("change", function(){
     state.imagesSetFilter = this.value;
@@ -2667,7 +2761,7 @@ const LOCAL_LANGS = [
         res = parseReferenceCsvText(text);
       } else if(url){
         res = await loadReferenceSheetFromUrl(url);
-        try{ localStorage.setItem("dm_ref_sheet_url", url); } catch(e){}
+        try{ localStorage.setItem(campaignScopedKey("dm_ref_sheet_url"), url); } catch(e){}
       } else {
         throw new Error("Colle le lien du Google Sheet, ou choisis un fichier CSV téléchargé.");
       }
@@ -2706,7 +2800,7 @@ const LOCAL_LANGS = [
         : "Aucune carte avec un project_number trouvée dans ce fichier.";
       try{
         const urlVal = document.getElementById("origTextUrl").value.trim();
-        if(urlVal) localStorage.setItem("dm_origtext_url", urlVal);
+        if(urlVal) localStorage.setItem(campaignScopedKey("dm_origtext_url"), urlVal);
       } catch(e){}
       if(!document.getElementById("imageLightbox").hidden) renderLightboxText();
     } catch(err){
@@ -2718,6 +2812,17 @@ const LOCAL_LANGS = [
   document.getElementById("origTextLoadBtn").addEventListener("click", runOrigTextLoad);
   document.getElementById("origTextUrl").addEventListener("keydown", function(e){
     if(e.key === "Enter") runOrigTextLoad();
+  });
+  document.getElementById("origTextClearBtn").addEventListener("click", function(){
+    ORIG_TEXT_BY_NUMBER = {};
+    lightboxShowingOrig = false;
+    document.getElementById("origTextUrl").value = "";
+    document.getElementById("origTextFile").value = "";
+    try{ localStorage.removeItem(campaignScopedKey("dm_origtext_url")); } catch(e){}
+    const statusEl = document.getElementById("origTextStatus");
+    statusEl.className = "source-status";
+    statusEl.textContent = DEFAULT_ORIGTEXT_STATUS;
+    if(!document.getElementById("imageLightbox").hidden) renderLightboxText();
   });
   document.getElementById("lightboxFlipBtn").addEventListener("click", function(){
     lightboxShowingOrig = !lightboxShowingOrig;
@@ -2801,27 +2906,9 @@ const LOCAL_LANGS = [
     try{ savedCampaign = localStorage.getItem("dm_drive_campaign") || "cyclopean"; } catch(e){}
     document.getElementById("driveCampaignSelect").value = savedCampaign;
     applyCampaignPreset();
-
-    let savedDriveKey = null;
-    try{ savedDriveKey = localStorage.getItem("dm_drive_key"); } catch(e){}
-    if(savedDriveKey){
-      document.getElementById("driveApiKeyInput").value = savedDriveKey;
-      if(document.getElementById("driveFolderInput").value.trim()) runDriveLoad();
-    }
-
-    let savedRefSheetUrl = null;
-    try{ savedRefSheetUrl = localStorage.getItem("dm_ref_sheet_url"); } catch(e){}
-    if(savedRefSheetUrl){
-      document.getElementById("refSheetUrl").value = savedRefSheetUrl;
-      runRefSheetLoad();
-    }
-
-    let savedOrigTextUrl = null;
-    try{ savedOrigTextUrl = localStorage.getItem("dm_origtext_url"); } catch(e){}
-    if(savedOrigTextUrl){
-      document.getElementById("origTextUrl").value = savedOrigTextUrl;
-      runOrigTextLoad();
-    }
+    // Charge (et lance si des valeurs sont mémorisées) les réglages propres à cette
+    // campagne uniquement — jamais ceux d'une autre campagne/projet utilisé sur ce même site.
+    loadCampaignScopedState(true);
   }
 
   init();
